@@ -3,7 +3,7 @@ import { db } from './db.js';
 import { importFiles } from './importer.js';
 import { makeBackup, saveBackup, readBackup, restoreBackup } from './backup.js';
 import { openReader } from './reader.js';
-import { esc, ICON, toast, actionSheet, askText, confirmDialog, onLongPress } from './ui.js';
+import { esc, ICON, toast, actionSheet, askText, confirmDialog, onLongPress, setThemeColor } from './ui.js';
 
 const pref = (k, d) => { try { const v = localStorage.getItem('booknest.' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } };
 const setPref = (k, v) => { try { localStorage.setItem('booknest.' + k, JSON.stringify(v)); } catch (e) { /* ignore */ } };
@@ -21,7 +21,7 @@ function applyAppearance() {
   const root = document.documentElement;
   if (S.appearance === 'system') delete root.dataset.theme; else root.dataset.theme = S.appearance;
   if (!document.body.classList.contains('reading')) {
-    document.querySelector('meta[name=theme-color]')?.setAttribute('content', getComputedStyle(document.body).backgroundColor);
+    setThemeColor(getComputedStyle(document.body).backgroundColor);
   }
 }
 matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', applyAppearance);

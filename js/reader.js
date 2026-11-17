@@ -5,7 +5,7 @@ import { openText, decodeText } from './textbook.js';
 import { loadPdfJs } from './importer.js';
 import { ENGINE_SOURCE } from './engine.js';
 import { bookFlip } from './flip.js';
-import { esc, ICON } from './ui.js';
+import { esc, ICON, setThemeColor } from './ui.js';
 
 export const THEMES = {
   light: { bg: '#ffffff', fg: '#1c1c1e', link: '#0a60d0', label: 'Light' },
@@ -83,7 +83,7 @@ export async function openReader(record, { onClose, onProgress }) {
     root.style.setProperty('--rbg', t.bg);
     root.style.setProperty('--rfg', t.fg);
     root.style.setProperty('--rlink', t.link);
-    document.querySelector('meta[name=theme-color]')?.setAttribute('content', t.bg);
+    setThemeColor(t.bg);
   }
   const isPDF = record.format === 'pdf';
   const spreadNow = () => settings.spread && settings.mode === 'paged' && spreadFits(stage.clientWidth, stage.clientHeight);

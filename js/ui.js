@@ -17,6 +17,22 @@ export const ICON = {
   book: '<svg width="64" height="64" viewBox="0 0 1024 1024" aria-hidden="true"><path d="M150 330 L150 750 C290 716 420 724 512 792 C604 724 734 716 874 750 L874 330" fill="none" stroke="currentColor" stroke-width="40" stroke-linejoin="round" stroke-linecap="round"/><path d="M500 312 C420 262 300 252 196 282 L196 712 C300 684 420 692 500 746 Z M524 312 C604 262 724 252 828 282 L828 712 C724 684 604 692 524 746 Z" fill="currentColor"/></svg>',
 };
 
+/**
+ * Sets the colour iOS uses for the status bar area. The tag is replaced rather than edited,
+ * because some iOS versions only notice a new theme-color tag, not a changed value.
+ */
+export function setThemeColor(color) {
+  const rgb = /^rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(color);
+  if (rgb) color = '#' + rgb.slice(1, 4).map(n => (+n).toString(16).padStart(2, '0')).join('');
+  const old = document.querySelectorAll('meta[name="theme-color"]');
+  if (old.length === 1 && old[0].getAttribute('content') === color) return;
+  old.forEach(m => m.remove());
+  const m = document.createElement('meta');
+  m.name = 'theme-color';
+  m.content = color;
+  document.head.appendChild(m);
+}
+
 export function toast(msg, ms = 2600) {
   const t = document.createElement('div');
   t.className = 'toast';
