@@ -185,12 +185,27 @@ function engine(flip) {
 
   function bind() {
     if (bound) return; bound = true;
-    var sx = 0, sy = 0, st = 0;
+    var sx = 0, sy = 0, st = 0, noDrag = false;
     document.addEventListener('pointerdown', function (e) {
       if (!e.isPrimary) return;
-      sx = e.clientX; sy = e.clientY; st = Date.now();
+      sx = e.clientX; sy = e.clientY; st = Date.now(); noDrag = false;
     }, { passive: true });
+    document.addEventListener('pointermove', function (e) {
+      if (!st || !e.isPrimary || !cfg || !paged()) return;
+      if (drag) { dragMove(e.clientX, e.clientY); return; }
+      if (noDrag) return;
+      var dx = e.clientX - sx, dy = e.clientY - sy;
+      if (Math.abs(dx) < 12 || Math.abs(dx) < Math.abs(dy) * 1.2) return;
+      var sel = window.getSelection();
+      var dir = dx < 0 ? 1 : -1;
+      // No page to drag to within this chapter (or animation off): let the swipe handle it on release.
+      if ((sel && sel.toString().length) || !canAnimate() || (dir > 0 ? page >= pageCount - 1 : page <= 0)) { noDrag = true; return; }
+      dragStart(dir, sx, sy);
+      dragMove(e.clientX, e.clientY);
+    }, { passive: true });
+    document.addEventListener('pointercancel', function () { if (drag) dragEnd(true); st = 0; });
     document.addEventListener('pointerup', function (e) {
+      if (drag && e.isPrimary) { dragEnd(false); st = 0; return; }
       if (!st || !e.isPrimary) return;
       var dx = e.clientX - sx, dy = e.clientY - sy, dt = Date.now() - st; st = 0;
       var sel = window.getSelection();
@@ -219,26 +234,69 @@ function engine(flip) {
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { if (cfg) relayout(); });
   }
 
-  // Moves to another page, with the page-turn animation when it's switched on.
+  // ---- page curl ----
+  function reduceMotion() { return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
+  function canAnimate() { return cfg.animate && !reduceMotion() && !!flip; }
+  function view(p, k) {
+    return function () {
+      var b = document.body.cloneNode(true);   // a <body> copy, so the book's own body styles still apply
+      b.removeAttribute('id');
+      b.style.transform = 'translateX(' + (-p * k.vw) + 'px)';
+      return b;
+    };
+  }
+  function curlOptions(from, to, dir, k) {
+    return { host: document.documentElement, position: 'fixed', W: k.vw, H: k.vh, spread: k.cols === 2,
+             dir: dir, from: view(from, k), to: view(to, k), bg: cfg.bg, dark: !!cfg.dark };
+  }
+
+  // Moves to another page, curling it over when animation is switched on.
   function turn(to, dir) {
     if (flipping) { flipping.finish(); flipping = null; }
     var from = page;
     setPage(to);
-    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (page === from || !cfg.animate || reduce || !flip) { report(true); return; }
-    var k = metrics();
-    var view = function (p) {
-      return function () {
-        var b = document.body.cloneNode(true);   // a <body> copy, so the book's own body styles still apply
-        b.removeAttribute('id');
-        b.style.transform = 'translateX(' + (-p * k.vw) + 'px)';
-        return b;
-      };
-    };
-    var f = flip({ host: document.documentElement, position: 'fixed', W: k.vw, H: k.vh, spread: k.cols === 2,
-                   dir: dir, from: view(from), to: view(page), bg: cfg.bg, duration: cfg.spread ? 560 : 480 });
+    if (page === from || !canAnimate()) { report(true); return; }
+    var opts = curlOptions(from, page, dir, metrics());
+    opts.duration = opts.spread ? 620 : 540;
+    var f = flip(opts);
     flipping = f;
     f.done.then(function () { if (flipping === f) flipping = null; report(true); });
+  }
+
+  // Dragging a page: the corner follows the finger; letting go finishes or cancels the turn.
+  var drag = null;
+  function dragStart(dir, x, y) {
+    if (flipping) { flipping.finish(); flipping = null; }
+    var k = metrics(), from = page;
+    setPage(page + dir);
+    var opts = curlOptions(from, page, dir, k);
+    opts.manual = true;
+    opts.top = y < k.vh * 0.4;
+    var ctrl = flip(opts);
+    drag = { ctrl: ctrl, from: from, dir: dir, x0: x, y0: y, p0: ctrl.startPoint(), lastX: x, lastT: Date.now(), vx: 0 };
+  }
+  function dragMove(x, y) {
+    var g = drag;
+    g.ctrl.setPoint(g.p0[0] + (x - g.x0) * 1.35, g.p0[1] + (y - g.y0) * 0.7);
+    var now = Date.now(), dt = Math.max(1, now - g.lastT);
+    g.vx = 0.6 * g.vx + 0.4 * ((x - g.lastX) / dt);
+    g.lastX = x; g.lastT = now;
+  }
+  function dragEnd(cancelled) {
+    var g = drag; drag = null;
+    var t = g.ctrl.progress(), commit;
+    if (cancelled) commit = false;
+    else if (g.dir > 0) commit = g.vx < -0.3 || (t > 0.22 && g.vx < 0.3);
+    else commit = g.vx > 0.3 || (t < 0.78 && g.vx > -0.3);
+    var target = (g.dir > 0) === commit ? 1 : 0;
+    var settle = function () { g.ctrl.destroy(); if (!commit) setPage(g.from); };
+    var f = { finish: settle };
+    flipping = f;
+    g.ctrl.play(target, 160 + 300 * Math.abs(target - t), false).then(function () {
+      settle();
+      if (flipping === f) flipping = null;
+      report(true);
+    });
   }
 
   S.setup = function (config, target) { cfg = config; layout(); bind(); go(target); return true; };

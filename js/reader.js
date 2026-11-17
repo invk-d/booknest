@@ -145,7 +145,8 @@ export async function openReader(record, { onClose, onProgress }) {
     const font = FONTS.find(f => f[0] === settings.font) || FONTS[1];
     return { bg: t.bg, fg: t.fg, link: t.link, font: font[2], fontSize: settings.size, lineHeight: settings.line,
              margin: settings.margin, marginV: 28, justify: settings.justify, hyphenate: settings.hyphenate,
-             mode: settings.mode, spread: spreadNow(), gutter: settings.gutter, animate: settings.animate !== false };
+             mode: settings.mode, spread: spreadNow(), gutter: settings.gutter, animate: settings.animate !== false,
+             dark: [THEMES.gray, THEMES.dark, THEMES.black].includes(t) };
   }
 
   window.__booknest = msg => {
@@ -254,7 +255,8 @@ export async function openReader(record, { onClose, onProgress }) {
     if (fromCopy) {
       const f = bookFlip({ host: stage, position: 'absolute', W: stage.clientWidth, H: stage.clientHeight,
                            spread: spreadNow(), dir, from: () => copyBox(fromCopy), to: () => copyBox(box),
-                           bg: theme(settings).bg, duration: spreadNow() ? 560 : 480 });
+                           bg: theme(settings).bg, dark: [THEMES.gray, THEMES.dark, THEMES.black].includes(theme(settings)),
+                           duration: spreadNow() ? 620 : 540 });
       pdfFlip = f;
       f.done.then(() => { if (pdfFlip === f) pdfFlip = null; });
     }
@@ -339,7 +341,7 @@ export async function openReader(record, { onClose, onProgress }) {
       <div class="lbl">Theme</div><div class="swatches">${sw('system')}${Object.entries(THEMES).map(([k, t]) => sw(k, t)).join('')}</div>
       ${text}
       <div class="lbl">Page Turn</div>
-      <div class="ctl"><span class="grow">Page-turn animation</span><button class="toggle" role="switch" id="anT" aria-checked="${st.animate !== false}" aria-label="Page-turn animation"></button></div>
+      <div class="ctl"><span class="grow">Page curl animation</span><button class="toggle" role="switch" id="anT" aria-checked="${st.animate !== false}" aria-label="Page curl animation"></button></div>
       <div class="lbl">iPhone Duo</div>
       <div class="ctl"><span class="grow">Two-page spread when unfolded</span><button class="toggle" role="switch" id="spT" aria-checked="${st.spread}" aria-label="Two-page spread when unfolded"></button></div>
       ${st.spread && !isPDF ? `<div class="ctl"><label for="guR">Center gutter</label><input type="range" id="guR" min="24" max="140" step="4" value="${st.gutter}"><span class="v">${st.gutter} pt</span></div>` : ''}
