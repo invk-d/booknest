@@ -178,7 +178,8 @@ function welcomeHTML() {
 function navTools() {
   return `<div class="tools">
     <button class="icon-btn" id="addBtn" aria-label="Add books or folder">${ICON.plus}</button>
-    <button class="icon-btn" id="sortBtn" aria-label="Sort, view and appearance" aria-expanded="${S.sortOpen}">${ICON.sort}</button>
+    <button class="icon-btn" id="themeBtn" aria-label="Library appearance: ${({ system: 'Automatic', light: 'Light', dark: 'Dark' })[S.appearance]}">${({ system: ICON.autoTheme, light: ICON.sun, dark: ICON.moon })[S.appearance]}</button>
+    <button class="icon-btn" id="sortBtn" aria-label="Sort and view" aria-expanded="${S.sortOpen}">${ICON.sort}</button>
     <button class="icon-btn" id="moreBtn" aria-label="Back up or restore library">${ICON.more}</button></div>`;
 }
 
@@ -286,6 +287,16 @@ function bind() {
     { label: 'Import Folder…', action: importFolder },
     { label: 'New Folder…', action: newFolder },
   ]);
+  const themeBtn = document.getElementById('themeBtn');
+  if (themeBtn) themeBtn.onclick = () => {
+    const pick = look => () => { S.appearance = look; setPref('appearance', look); applyAppearance(); render(); };
+    const mark = look => (S.appearance === look ? '  ✓' : '');
+    actionSheet('Library appearance', [
+      { label: 'Light' + mark('light'), action: pick('light') },
+      { label: 'Dark' + mark('dark'), action: pick('dark') },
+      { label: 'Automatic (match iPhone)' + mark('system'), action: pick('system') },
+    ]);
+  };
   const more = document.getElementById('moreBtn');
   if (more) more.onclick = backupMenu;
   app.querySelectorAll('[data-act="restore"]').forEach(b => b.onclick = () => restoreInput.click());
@@ -313,8 +324,7 @@ function showSortMenu() {
   const item = (attr, on, label) => `<button role="menuitemradio" aria-checked="${on}" ${attr}><span class="ck">${on ? '✓' : ''}</span>${label}</button>`;
   pop.innerHTML = `<div class="ph">Sort By</div>${SORTS.map(([k, l]) => item(`data-sort="${k}"`, S.sort === k, l)).join('')}
     <hr>${item('data-asc="1"', S.asc, t ? 'A to Z' : 'Oldest First')}${item('data-asc="0"', !S.asc, t ? 'Z to A' : 'Newest First')}
-    <hr>${item('data-grid="1"', S.grid, 'Grid')}${item('data-grid="0"', !S.grid, 'List')}
-    <hr><div class="ph">Appearance</div>${item('data-look="system"', S.appearance === 'system', 'Automatic')}${item('data-look="light"', S.appearance === 'light', 'Light')}${item('data-look="dark"', S.appearance === 'dark', 'Dark')}`;
+    <hr>${item('data-grid="1"', S.grid, 'Grid')}${item('data-grid="0"', !S.grid, 'List')}`;
   pop.style.top = (r.bottom + 6) + 'px';
   pop.style.right = Math.max(8, window.innerWidth - r.right) + 'px';
   document.body.appendChild(pop);
@@ -326,7 +336,6 @@ function showSortMenu() {
   });
   pop.querySelectorAll('[data-asc]').forEach(b => b.onclick = () => { S.asc = b.dataset.asc === '1'; setPref('asc', S.asc); done(); });
   pop.querySelectorAll('[data-grid]').forEach(b => b.onclick = () => { S.grid = b.dataset.grid === '1'; setPref('grid', S.grid); done(); });
-  pop.querySelectorAll('[data-look]').forEach(b => b.onclick = () => { S.appearance = b.dataset.look; setPref('appearance', S.appearance); applyAppearance(); done(); });
 }
 document.addEventListener('click', () => {
   if (S.sortOpen) { S.sortOpen = false; document.querySelector('.sortpop')?.remove(); render(); }
@@ -612,6 +621,7 @@ async function openBook(id) {
     return;
   }
   reading = true;
+  document.querySelectorAll('.toast').forEach(t => t.remove());
   await openReader(b, {
     onProgress: pos => { S.progress[pos.bookId] = pos; },
     onClose: () => { reading = false; if (updateWaiting) location.reload(); else { applyAppearance(); render(); } },

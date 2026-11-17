@@ -39,7 +39,7 @@ body.reading .app { visibility: hidden; }
 .navrow { display: flex; align-items: center; justify-content: space-between; min-height: 36px; gap: 8px; }
 .back { color: var(--accent); font-size: 17px; display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 60%; }
 .back span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.tools { display: flex; gap: 14px; align-items: center; margin-left: auto; }
+.tools { display: flex; gap: 8px; align-items: center; margin-left: auto; }
 .icon-btn { color: var(--accent); width: 34px; height: 34px; display: grid; place-items: center; border-radius: 9px; }
 .icon-btn[aria-expanded="true"] { background: var(--accent-soft); }
 .bigtitle { font-size: 32px; font-weight: 700; letter-spacing: -.02em; margin: 2px 0 8px; overflow-wrap: anywhere; text-wrap: balance; }
