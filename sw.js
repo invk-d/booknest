@@ -1,12 +1,13 @@
 // Offline support: the app's own files are cached so BookNest opens without a connection.
 // Bump VERSION whenever any of these files change, so phones pick up the update.
-const VERSION = 'booknest-v5';
+const VERSION = 'booknest-v6';
 const ASSETS = [
   './',
   './index.html',
   './manifest.webmanifest',
   './css/app.css',
   './js/app.js',
+  './js/backup.js',
   './js/db.js',
   './js/engine.js',
   './js/epub.js',

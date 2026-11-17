@@ -20,6 +20,11 @@ An eReader with folders. It runs in Safari and can be added to your iPhone Home 
 
 Your books are stored in the browser's storage on your device. They aren't uploaded anywhere.
 
+## Backups
+Tap **⋯ → Back Up Library…**, then choose **Save to Files** on the Share sheet. The backup is a small `.json` file holding your folders, book list, reading progress and settings. The book files themselves stay in the Files app and are never touched.
+
+To recover, tap **⋯ → Restore from Backup…** (or **Restore from a backup** on the welcome screen) and choose the file. Everything comes back, and books show **File needed** until you add their files again from Files. You can pick them all at once. BookNest recognises each book by its contents and puts it back in its folder with your place kept. Restoring never deletes anything already in BookNest.
+
 ## Put it online with GitHub Pages
 1. Create a repository on GitHub (for example `booknest`) and upload everything in this folder to it.
 2. In the repository, go to **Settings → Pages**. Under "Build and deployment", choose **Deploy from a branch**, then pick `main` and `/ (root)`, and tap **Save**.

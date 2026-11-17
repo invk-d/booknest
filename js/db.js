@@ -45,6 +45,7 @@ export const db = {
   get: (store, key) => run(store, 'readonly', t => t.objectStore(store).get(key)),
   put: (store, value, key) => run(store, 'readwrite', t =>
     key === undefined ? t.objectStore(store).put(value) : t.objectStore(store).put(value, key)),
+  keys: store => run(store, 'readonly', t => t.objectStore(store).getAllKeys()),
   del: (store, key) => run(store, 'readwrite', t => t.objectStore(store).delete(key)),
 
   /** Saves a newly imported book, its file and cover in one transaction. */

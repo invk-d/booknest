@@ -66,15 +66,21 @@ export function askText(title, initial = '', okLabel = 'Save') {
 }
 
 /** Confirmation dialog. Resolves true/false. */
-export function confirmDialog(title, message, okLabel = 'Delete') {
+/** onOk (optional) runs inside the tap on the OK button — needed for things like the Share sheet. */
+export function confirmDialog(title, message, okLabel = 'Delete', danger = true, onOk = null) {
   return new Promise(resolve => {
     const wrap = document.createElement('div');
     wrap.className = 'dlg-wrap';
     wrap.innerHTML = `<div class="dlg" role="alertdialog" aria-label="${esc(title)}"><b>${esc(title)}</b><p>${esc(message)}</p>
-      <div class="dlg-btns"><button class="dlg-cancel">Cancel</button><button class="dlg-ok danger">${esc(okLabel)}</button></div></div>`;
+      <div class="dlg-btns"><button class="dlg-cancel">Cancel</button><button class="dlg-ok${danger ? ' danger' : ''}">${esc(okLabel)}</button></div></div>`;
     const done = v => { wrap.remove(); resolve(v); };
     wrap.querySelector('.dlg-cancel').onclick = () => done(false);
-    wrap.querySelector('.dlg-ok').onclick = () => done(true);
+    wrap.querySelector('.dlg-ok').onclick = () => {
+      if (!onOk) { done(true); return; }
+      const r = onOk();
+      wrap.remove();
+      Promise.resolve(r).then(v => resolve(v !== false), () => resolve(false));
+    };
     document.body.appendChild(wrap);
     wrap.querySelector('.dlg-ok').focus();
   });

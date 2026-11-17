@@ -2,6 +2,7 @@
 import { db, requestPersistence } from './db.js';
 import { openEpub } from './epub.js';
 import { decodeText, markdownTitle } from './textbook.js';
+import { fingerprint } from './backup.js';
 
 let pdfjsPromise;
 export function loadPdfJs() {
@@ -92,32 +93,54 @@ async function describe(file, format) {
 }
 
 /**
- * Imports files into a folder. Returns { added: [book], skipped: [name], failed: [{name, error}] }.
+ * Imports files into a folder.
+ * A file that belongs to a book already in the library but missing its file (e.g. after
+ * restoring a backup) is reattached to that book, keeping its folder and reading progress.
+ * relinkId: attach the (single) file to this book, whatever it is.
+ * Returns { added, relinked, already, skipped, failed }.
  * onProgress(done, total) is called as each file finishes.
  */
-export async function importFiles(files, folderId, onProgress) {
+export async function importFiles(files, folderId, onProgress, relinkId = null) {
   requestPersistence();
-  const added = [], skipped = [], failed = [];
+  const added = [], relinked = [], already = [], skipped = [], failed = [];
+  const books = await db.all('books');
+  const haveFile = new Set(await db.keys('files'));
   let done = 0;
   for (const file of files) {
     const format = formatOf(file.name);
     if (!format) { skipped.push(file.name); onProgress?.(++done, files.length); continue; }
     try {
+      const fp = await fingerprint(file);
+      const match = relinkId ? books.find(b => b.id === relinkId)
+        : books.find(b => b.fp === fp) || books.find(b => !b.fp && !haveFile.has(b.id) && b.fileName === file.name && b.size === file.size);
+      if (match && haveFile.has(match.id) && !relinkId) { already.push(match); onProgress?.(++done, files.length); continue; }
+      if (match) {
+        const blob = new Blob([await file.arrayBuffer()], { type: file.type || 'application/octet-stream' });
+        let cover = await db.get('covers', match.id);
+        if (!cover) { try { cover = (await describe(file, format)).cover; } catch (e) { cover = null; } }
+        Object.assign(match, { fp, size: file.size, fileModified: file.lastModified || match.fileModified, format, fileName: file.name });
+        await db.addBook(match, blob, cover);
+        haveFile.add(match.id);
+        relinked.push(match);
+        onProgress?.(++done, files.length);
+        continue;
+      }
       const info = await describe(file, format);
       const book = {
         id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2),
         folderId: folderId ?? null,
         title: info.title, author: info.author, authorSort: info.authorSort,
         format, fileName: file.name, size: file.size,
-        fileModified: file.lastModified || Date.now(), added: Date.now(),
+        fileModified: file.lastModified || Date.now(), added: Date.now(), fp,
       };
       const blob = new Blob([await file.arrayBuffer()], { type: file.type || 'application/octet-stream' });
       await db.addBook(book, blob, info.cover);
+      books.push(book); haveFile.add(book.id);
       added.push(book);
     } catch (e) {
       failed.push({ name: file.name, error: e.message || String(e) });
     }
     onProgress?.(++done, files.length);
   }
-  return { added, skipped, failed };
+  return { added, relinked, already, skipped, failed };
 }

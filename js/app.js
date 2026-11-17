@@ -1,6 +1,7 @@
 // BookNest library: folders, books, sorting, and opening the reader.
 import { db } from './db.js';
 import { importFiles } from './importer.js';
+import { makeBackup, saveBackup, readBackup, restoreBackup } from './backup.js';
 import { openReader } from './reader.js';
 import { esc, ICON, toast, actionSheet, askText, confirmDialog, onLongPress } from './ui.js';
 
@@ -26,12 +27,15 @@ function applyAppearance() {
 matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', applyAppearance);
 const app = document.getElementById('app');
 const fileInput = document.getElementById('fileInput');
+const restoreInput = document.getElementById('restoreInput');
+let relinkId = null;              // set while picking the file for one particular book
 const coverURLs = new Map();      // bookId -> object URL | null
 
 // ---------- data ----------
 async function loadAll() {
-  const [folders, books, progress] = await Promise.all([db.all('folders'), db.all('books'), db.all('progress')]);
+  const [folders, books, progress, fileIds] = await Promise.all([db.all('folders'), db.all('books'), db.all('progress'), db.keys('files')]);
   S.folders = folders; S.books = books;
+  S.fileIds = new Set(fileIds);
   S.progress = Object.fromEntries(progress.map(p => [p.bookId, p]));
   if (S.folderId && !folderById(S.folderId)) S.folderId = null;
 }
@@ -80,9 +84,10 @@ const FORMAT_LABEL = { epub: 'EPUB', pdf: 'PDF', txt: 'TXT', md: 'MD' };
 
 function coverHTML(b) {
   const h = hueOf(b.title);
-  return `<div class="cover" data-cover="${b.id}" style="background:linear-gradient(150deg,hsl(${h} 38% 46%),hsl(${h} 46% 30%))">
+  const missing = S.fileIds && !S.fileIds.has(b.id);
+  return `<div class="cover${missing ? ' missing' : ''}" data-cover="${b.id}" style="background:linear-gradient(150deg,hsl(${h} 38% 46%),hsl(${h} 46% 30%))">
     <div class="ct">${esc(b.title)}</div>${b.author ? `<div class="ca">${esc(b.author)}</div>` : ''}
-    <div class="cf">${FORMAT_LABEL[b.format] || ''}</div></div>`;
+    <div class="cf">${FORMAT_LABEL[b.format] || ''}</div>${missing ? '<span class="need">File needed</span>' : ''}</div>`;
 }
 function progressHTML(b) {
   const p = S.progress[b.id];
@@ -117,6 +122,12 @@ function contentsHTML() {
     const recent = recentBooks();
     if (recent.length) h += `<div class="sec-h">Continue Reading</div><div class="recent">${recent.slice(0, 12).map(bookCard).join('')}</div>`;
   }
+  const missingCount = S.books.filter(b => !S.fileIds.has(b.id)).length;
+  if (S.folderId === null && missingCount && !q) {
+    h += `<div class="notice"><b>${missingCount} ${missingCount === 1 ? 'book needs its file' : 'books need their files'}</b>
+      <span>Add them again from the Files app (you can select them all at once). BookNest puts each one back in its folder with your place kept.</span>
+      <button class="btn" data-act="add">Add Book Files</button></div>`;
+  }
   if (folders.length) {
     h += `<div class="sec-h">Folders</div><div class="group">` + folders.map(f => {
       const n = childFolders(f.id).length + childBooks(f.id).length;
@@ -147,6 +158,7 @@ function welcomeHTML() {
     <h2>Welcome to BookNest</h2>
     <p>Add EPUB, PDF or text files from the Files app, then organise them into folders.</p>
     <div class="empty-btns"><button class="btn" data-act="add">Add Books</button><button class="btn ghost" data-act="newfolder">New Folder</button></div>
+    <button class="linkbtn" data-act="restore">Restore from a backup</button>
     ${ios && !installed ? `<div class="install"><b>Put BookNest on your Home Screen</b><span>In Safari, tap the Share button <svg width="14" height="17" viewBox="0 0 14 17" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-label="Share"><path d="M7 11V1.5M3.5 5 7 1.5 10.5 5"/><path d="M4.5 7.5H2.5v8h9v-8h-2"/></svg>, then <b>Add to Home Screen</b>.</span></div>` : ''}
   </div>`;
 }
@@ -154,7 +166,8 @@ function welcomeHTML() {
 function navTools() {
   return `<div class="tools">
     <button class="icon-btn" id="addBtn" aria-label="Add books or folder">${ICON.plus}</button>
-    <button class="icon-btn" id="sortBtn" aria-label="Sort, view and appearance" aria-expanded="${S.sortOpen}">${ICON.sort}</button></div>`;
+    <button class="icon-btn" id="sortBtn" aria-label="Sort, view and appearance" aria-expanded="${S.sortOpen}">${ICON.sort}</button>
+    <button class="icon-btn" id="moreBtn" aria-label="Back up or restore library">${ICON.more}</button></div>`;
 }
 
 function headerHTML() {
@@ -256,6 +269,9 @@ function bind() {
     { label: 'Add Books…', action: () => fileInput.click() },
     { label: 'New Folder…', action: newFolder },
   ]);
+  const more = document.getElementById('moreBtn');
+  if (more) more.onclick = backupMenu;
+  app.querySelectorAll('[data-act="restore"]').forEach(b => b.onclick = () => restoreInput.click());
   const sb = document.getElementById('sortBtn');
   if (sb) sb.onclick = e => { e.stopPropagation(); S.sortOpen = !S.sortOpen; render(); };
   if (S.sortOpen) showSortMenu();
@@ -266,6 +282,7 @@ function bindContent() {
   sc.querySelectorAll('[data-book]').forEach(el => el.onclick = () => openBook(el.dataset.book));
   sc.querySelectorAll('[data-act="add"]').forEach(b => b.onclick = () => fileInput.click());
   sc.querySelectorAll('[data-act="newfolder"]').forEach(b => b.onclick = newFolder);
+  sc.querySelectorAll('[data-act="restore"]').forEach(b => b.onclick = () => restoreInput.click());
 }
 
 function showSortMenu() {
@@ -423,17 +440,76 @@ async function addFiles(files) {
   files = Array.from(files || []);
   if (!files.length) return;
   const t = toast(`Adding ${files.length} ${files.length === 1 ? 'book' : 'books'}…`, 600000);
-  const res = await importFiles(files, S.folderId, (done, total) => { t.textContent = `Adding books… ${done} of ${total}`; });
+  const forBook = relinkId; relinkId = null;
+  if (forBook) files = files.slice(0, 1);
+  const res = await importFiles(files, S.folderId, (done, total) => { t.textContent = `Adding books… ${done} of ${total}`; }, forBook);
   t.remove();
+  for (const b of res.relinked) { const u = coverURLs.get(b.id); if (u) URL.revokeObjectURL(u); coverURLs.delete(b.id); }
   await loadAll();
   render();
   const parts = [];
   if (res.added.length) parts.push(`Added ${res.added.length} ${res.added.length === 1 ? 'book' : 'books'}`);
+  if (res.relinked.length) parts.push(`${res.relinked.length} ${res.relinked.length === 1 ? 'book is' : 'books are'} back in place`);
+  if (res.already.length) parts.push(`${res.already.length} already in your library`);
   if (res.skipped.length) parts.push(`skipped ${res.skipped.length} unsupported (EPUB, PDF, TXT and MD only)`);
   if (res.failed.length) parts.push(`couldn't read ${res.failed.map(f => f.name).join(', ')}`);
   toast(parts.join('; ') || 'Nothing added', 4000);
 }
 fileInput.onchange = () => { addFiles(fileInput.files); fileInput.value = ''; };
+// iOS gives no event when the picker is cancelled; forget a pending relink once focus returns.
+window.addEventListener('focus', () => setTimeout(() => { if (!fileInput.files?.length) relinkId = null; }, 1000));
+
+// ---------- backup & restore ----------
+function backupMenu() {
+  const last = pref('lastBackup', null);
+  const when = last ? `Last backed up ${new Date(last).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}.` : 'Not backed up yet.';
+  actionSheet(`${when} A backup holds your folders, reading progress and settings. Book files stay in the Files app.`, [
+    { label: 'Back Up Library…', action: backUp },
+    { label: 'Restore from Backup…', action: () => restoreInput.click() },
+  ]);
+}
+
+async function backUp() {
+  let backup;
+  const t = toast('Preparing backup…', 60000);
+  try { backup = await makeBackup(); }
+  catch (e) { t.remove(); toast('Couldn’t make the backup: ' + (e.message || e), 5000); return; }
+  t.remove();
+  // iOS only opens the Share sheet straight from a tap, so ask for one more tap once it's ready.
+  const ok = await confirmDialog('Backup ready',
+    `${backup.books} ${backup.books === 1 ? 'book' : 'books'}, ${backup.folders} ${backup.folders === 1 ? 'folder' : 'folders'} and your reading progress. Choose “Save to Files” on the next screen.`,
+    'Save…', false, () => saveBackup(backup.file));
+  if (ok) {
+    setPref('lastBackup', Date.now());
+    toast('Library backed up');
+  }
+}
+
+restoreInput.onchange = async () => {
+  const file = restoreInput.files?.[0];
+  restoreInput.value = '';
+  if (!file) return;
+  let data;
+  try { data = await readBackup(file); }
+  catch (e) { toast(e.message, 4500); return; }
+  const date = new Date(data.created).toLocaleString(undefined, { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+  const go = await confirmDialog(`Restore backup from ${date}?`,
+    `Brings back ${data.books.length} ${data.books.length === 1 ? 'book' : 'books'}, ${data.folders.length} ${data.folders.length === 1 ? 'folder' : 'folders'}, reading progress and settings. Nothing in BookNest is deleted, and your files in Files aren’t touched.`,
+    'Restore', false);
+  if (!go) return;
+  try {
+    const r = await restoreBackup(data);
+    S.appearance = pref('appearance', 'system'); S.sort = pref('sort', 'title'); S.asc = pref('asc', true); S.grid = pref('grid', true);
+    S.expanded = new Set(pref('expanded', []));
+    await loadAll();
+    applyAppearance();
+    S.folderId = null;
+    render();
+    toast(r.missing ? `Restored. ${r.missing} ${r.missing === 1 ? 'book needs its file' : 'books need their files'}: add them from the Files app and they’ll go back in place.` : 'Library restored', 6000);
+  } catch (e) {
+    toast('Couldn’t restore: ' + (e.message || e), 5000);
+  }
+};
 document.addEventListener('dragover', e => { if (e.dataTransfer?.types?.includes('Files')) { e.preventDefault(); document.body.classList.add('dropping'); } });
 document.addEventListener('dragleave', e => { if (!e.relatedTarget) document.body.classList.remove('dropping'); });
 document.addEventListener('drop', e => {
@@ -448,6 +524,12 @@ let reading = false, updateWaiting = false;
 async function openBook(id) {
   const b = S.books.find(x => x.id === id);
   if (!b || reading) return;
+  if (!S.fileIds.has(b.id)) {
+    actionSheet(`“${b.title}” needs its file. Choose ${b.fileName} in the Files app to read it here.`, [
+      { label: 'Choose File…', action: () => { relinkId = b.id; fileInput.click(); } },
+    ]);
+    return;
+  }
   reading = true;
   await openReader(b, {
     onProgress: pos => { S.progress[pos.bookId] = pos; },
