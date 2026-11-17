@@ -9,12 +9,23 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="BookNest">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <!-- Not translucent: iOS then colours the status bar area with theme-color, which BookNest
+       keeps in step with the theme on screen (library appearance or the book's page colour). -->
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon-192.png" type="image/png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="stylesheet" href="css/app.css">
-  <script>try { var a = JSON.parse(localStorage.getItem('booknest.appearance') || '"system"'); if (a !== 'system') document.documentElement.dataset.theme = a; } catch (e) {}</script>
+  <script>
+    // Apply the library appearance and status bar colour before the first paint.
+    (function () {
+      var a = 'system';
+      try { a = JSON.parse(localStorage.getItem('booknest.appearance') || '"system"'); } catch (e) {}
+      if (a !== 'system') document.documentElement.dataset.theme = a;
+      var dark = a === 'dark' || (a === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+      document.querySelector('meta[name=theme-color]').setAttribute('content', dark ? '#000000' : '#f2f2f7');
+    })();
+  </script>
   <script src="vendor/jszip.min.js" defer></script>
   <script type="module" src="js/app.js"></script>
 </head>
