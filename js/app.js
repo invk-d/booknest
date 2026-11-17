@@ -40,8 +40,10 @@ async function loadAll() {
   S.folders = folders; S.books = books;
   S.fileIds = new Set(fileIds);
   S.progress = Object.fromEntries(progress.map(p => [p.bookId, p]));
-  if (S.folderId && !folderById(S.folderId)) S.folderId = null;
+  if (S.folderId && S.folderId !== TOREAD && !folderById(S.folderId)) S.folderId = null;
 }
+const TOREAD = ':toread';            // the To Read list, shown like a folder
+const here = () => (S.folderId === TOREAD ? null : S.folderId);   // where new books/folders go
 const folderById = id => S.folders.find(f => f.id === id) || null;
 const childFolders = id => S.folders.filter(f => (f.parentId ?? null) === id).sort((a, b) => coll.compare(a.name, b.name));
 const childBooks = id => S.books.filter(b => (b.folderId ?? null) === id);
@@ -90,7 +92,7 @@ function coverHTML(b) {
   const missing = S.fileIds && !S.fileIds.has(b.id);
   return `<div class="cover${missing ? ' missing' : ''}" data-cover="${b.id}" style="background:linear-gradient(150deg,hsl(${h} 38% 46%),hsl(${h} 46% 30%))">
     <div class="ct">${esc(b.title)}</div>${b.author ? `<div class="ca">${esc(b.author)}</div>` : ''}
-    <div class="cf">${FORMAT_LABEL[b.format] || ''}</div>${missing ? '<span class="need">File needed</span>' : ''}</div>`;
+    <div class="cf">${FORMAT_LABEL[b.format] || ''}</div>${missing ? '<span class="need">File needed</span>' : ''}${b.toRead ? '<span class="ribbon" title="To Read"></span>' : ''}</div>`;
 }
 function progressHTML(b) {
   const p = S.progress[b.id];
@@ -118,8 +120,10 @@ const recentBooks = () => S.books.filter(b => S.progress[b.id]?.last).sort((a, b
 function contentsHTML() {
   const q = S.search.trim().toLowerCase();
   const hit = s => (s || '').toLowerCase().includes(q);
-  const folders = childFolders(S.folderId).filter(f => !q || hit(f.name));
-  const books = sortBooks(childBooks(S.folderId).filter(b => !q || hit(b.title) || hit(b.author) || hit(b.fileName)));
+  const inToRead = S.folderId === TOREAD;
+  const folders = inToRead ? [] : childFolders(S.folderId).filter(f => !q || hit(f.name));
+  const books = sortBooks((inToRead ? S.books.filter(b => b.toRead) : childBooks(S.folderId))
+    .filter(b => !q || hit(b.title) || hit(b.author) || hit(b.fileName)));
   let h = '';
   if (!S.wide && S.folderId === null && !q) {
     const recent = recentBooks();
@@ -130,6 +134,10 @@ function contentsHTML() {
     h += `<div class="notice"><b>${missingCount} ${missingCount === 1 ? 'book needs its file' : 'books need their files'}</b>
       <span>Add them again from the Files app (you can select them all at once). BookNest puts each one back in its folder with your place kept.</span>
       <button class="btn" data-act="add">Add Book Files</button></div>`;
+  }
+  if (S.folderId === null && !q && S.books.length) {
+    const n = S.books.filter(b => b.toRead).length;
+    h += `<div class="sec-h">Lists</div><div class="group"><button class="row" data-folder="${TOREAD}">${ICON.bookmark}<span class="label">To Read</span><span class="count">${n}</span>${ICON.chev}</button></div>`;
   }
   if (folders.length) {
     h += `<div class="sec-h">Folders</div><div class="group">` + folders.map(f => {
@@ -145,6 +153,7 @@ function contentsHTML() {
   if (!folders.length && !books.length) {
     if (q) h = `<div class="empty">No results for “${esc(S.search)}”.</div>`;
     else if (S.folderId === null) h = welcomeHTML();
+    else if (inToRead) h = `<div class="empty">Nothing on your To Read list yet.<br>Press and hold any book and choose <b>Add to To Read</b>.</div>`;
     else h = `<div class="empty">This folder is empty.<div class="empty-btns"><button class="btn" data-act="add">Add Books</button><button class="btn ghost" data-act="newfolder">New Folder</button></div></div>`;
   }
   if (S.folderId === null && S.books.length) {
@@ -176,9 +185,10 @@ function navTools() {
 function headerHTML() {
   const cur = folderById(S.folderId);
   const parent = cur ? folderById(cur.parentId) : null;
-  const back = cur ? `<button class="back" id="backBtn">${ICON.back}<span>${esc(parent ? parent.name : 'Library')}</span></button>` : '<span></span>';
+  const inToRead = S.folderId === TOREAD;
+  const back = cur || inToRead ? `<button class="back" id="backBtn">${ICON.back}<span>${esc(parent ? parent.name : 'Library')}</span></button>` : '<span></span>';
   return `<div class="navbar"><div class="navrow">${back}${navTools()}</div>
-    <h1 class="bigtitle">${esc(cur ? cur.name : 'Library')}</h1>
+    <h1 class="bigtitle">${esc(inToRead ? 'To Read' : cur ? cur.name : 'Library')}</h1>
     ${S.books.length || S.folders.length ? `<label class="search">${ICON.search}<input id="search" type="search" placeholder="Title, author or file name" value="${esc(S.search)}" aria-label="Search this folder"></label>` : ''}
   </div>`;
 }
@@ -201,6 +211,9 @@ function render() {
     app.innerHTML = `<nav class="sidebar" aria-label="Folders"><div class="navbar"><div class="navrow"><span></span></div><div class="bigtitle">BookNest</div></div>
       <div class="scroll">
         ${recent.length ? `<div class="sec-h">Continue Reading</div>${recent.map(b => `<button class="side-recent" data-book="${b.id}">${coverHTML(b)}<span class="meta"><span>${esc(b.title)}</span><span class="bar"><i style="width:${Math.round((S.progress[b.id].fraction || 0) * 100)}%"></i></span></span></button>`).join('')}` : ''}
+        <div class="sec-h">Lists</div>
+        <div class="tree"><button class="tnode${S.folderId === TOREAD ? ' sel' : ''}" data-tree="${TOREAD}">
+          <span class="disc" style="visibility:hidden"></span>${ICON.bookmark}<span class="lbl">To Read</span><span class="tcount">${S.books.filter(b => b.toRead).length}</span></button></div>
         <div class="sec-h">Folders</div>
         <div class="tree"><button class="tnode${S.folderId === null ? ' sel' : ''}" data-tree="">
           <span class="disc" style="visibility:hidden"></span>${ICON.folder}<span class="lbl">Library</span></button>${treeHTML(null, 1)}</div>
@@ -257,7 +270,7 @@ function bind() {
   app.querySelectorAll('[data-act="add"]').forEach(b => b.onclick = () => fileInput.click());
   app.querySelectorAll('[data-act="newfolder"]').forEach(b => b.onclick = newFolder);
   const back = document.getElementById('backBtn');
-  if (back) back.onclick = () => go(folderById(S.folderId)?.parentId ?? null);
+  if (back) back.onclick = () => go(S.folderId === TOREAD ? null : folderById(S.folderId)?.parentId ?? null);
   const search = document.getElementById('search');
   if (search) search.oninput = () => {
     S.search = search.value;
@@ -324,7 +337,7 @@ const _render = render;
 async function newFolder() {
   const name = await askText('New Folder', '', 'Create');
   if (!name) return;
-  const f = { id: newId(), name, parentId: S.folderId };
+  const f = { id: newId(), name, parentId: here() };
   await db.put('folders', f);
   S.folders.push(f);
   render();
@@ -364,6 +377,13 @@ async function deleteBook(b) {
   await db.deleteBook(b.id);
   S.books = S.books.filter(x => x.id !== b.id);
   delete S.progress[b.id];
+  render();
+}
+
+async function toggleToRead(b) {
+  b.toRead = b.toRead ? null : Date.now();
+  await db.put('books', b);
+  toast(b.toRead ? `Added “${b.title}” to To Read` : `Removed “${b.title}” from To Read`);
   render();
 }
 
@@ -423,6 +443,7 @@ onLongPress(app, '[data-book], [data-folder], [data-tree]', el => {
     const b = S.books.find(x => x.id === el.dataset.book);
     if (!b) return;
     const items = [
+      { label: b.toRead ? 'Remove from To Read' : 'Add to To Read', action: () => toggleToRead(b) },
       { label: 'Move to…', action: () => moveBook(b) },
       { label: 'Rename…', action: () => renameBook(b) },
     ];
@@ -456,7 +477,7 @@ async function addFiles(files) {
       const made = new Set(), tops = new Set();
       files = [];
       for (const it of items) {
-        let parent = S.folderId;
+        let parent = here();
         for (const name of it.dirs) parent = await ensureFolder(parent, name, made);
         if (it.dirs.length) tops.add(it.dirs[0]);
         files.push({ file: it.file, folderId: parent });
@@ -469,8 +490,9 @@ async function addFiles(files) {
       return;
     }
   }
-  const res = await importFiles(files, S.folderId, (done, total) => { t.textContent = `Adding books… ${done} of ${total}`; }, forBook);
+  const res = await importFiles(files, here(), (done, total) => { t.textContent = `Adding books… ${done} of ${total}`; }, forBook);
   t.remove();
+  if (S.folderId === TOREAD) for (const b of res.added) { b.toRead = Date.now(); await db.put('books', b); }
   for (const b of res.relinked) { const u = coverURLs.get(b.id); if (u) URL.revokeObjectURL(u); coverURLs.delete(b.id); }
   await loadAll();
   render();

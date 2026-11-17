@@ -8,6 +8,7 @@ An eReader with folders. It runs in Safari and can be added to your iPhone Home 
 - **Folders inside folders.** Create, rename, move and delete them. Press and hold a book or folder for options.
 - **Add books from the Files app:** EPUB, PDF, TXT and Markdown. On a computer you can also drag files onto the window.
 - **Sort** by Title (ignoring "The", "A" and "An"), Author (last name first), File Name, Date Added or Recently Read. Grid or list view, and search by title, author or file name.
+- **To Read list.** Press and hold any book and choose **Add to To Read**. The list collects marked books from every folder in one place, and marked books get a bookmark ribbon on the cover.
 - **Remembers where you stopped in every book**, with a "Continue Reading" shelf and a % read bar on each book.
 - **Reader:**
   - Themes: Auto, Light, Sepia, Gray, Dark and Black.
