@@ -13,7 +13,17 @@ const S = {
   sort: pref('sort', 'title'), asc: pref('asc', true), grid: pref('grid', true),
   search: '', sortOpen: false, wide: false,
   expanded: new Set(pref('expanded', [])),
+  appearance: pref('appearance', 'system'),   // library theme: 'system' | 'light' | 'dark'
 };
+
+function applyAppearance() {
+  const root = document.documentElement;
+  if (S.appearance === 'system') delete root.dataset.theme; else root.dataset.theme = S.appearance;
+  if (!document.body.classList.contains('reading')) {
+    document.querySelector('meta[name=theme-color]')?.setAttribute('content', getComputedStyle(document.body).backgroundColor);
+  }
+}
+matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', applyAppearance);
 const app = document.getElementById('app');
 const fileInput = document.getElementById('fileInput');
 const coverURLs = new Map();      // bookId -> object URL | null
@@ -144,7 +154,7 @@ function welcomeHTML() {
 function navTools() {
   return `<div class="tools">
     <button class="icon-btn" id="addBtn" aria-label="Add books or folder">${ICON.plus}</button>
-    <button class="icon-btn" id="sortBtn" aria-label="Sort and view" aria-expanded="${S.sortOpen}">${ICON.sort}</button></div>`;
+    <button class="icon-btn" id="sortBtn" aria-label="Sort, view and appearance" aria-expanded="${S.sortOpen}">${ICON.sort}</button></div>`;
 }
 
 function headerHTML() {
@@ -268,7 +278,8 @@ function showSortMenu() {
   const item = (attr, on, label) => `<button role="menuitemradio" aria-checked="${on}" ${attr}><span class="ck">${on ? '✓' : ''}</span>${label}</button>`;
   pop.innerHTML = `<div class="ph">Sort By</div>${SORTS.map(([k, l]) => item(`data-sort="${k}"`, S.sort === k, l)).join('')}
     <hr>${item('data-asc="1"', S.asc, t ? 'A to Z' : 'Oldest First')}${item('data-asc="0"', !S.asc, t ? 'Z to A' : 'Newest First')}
-    <hr>${item('data-grid="1"', S.grid, 'Grid')}${item('data-grid="0"', !S.grid, 'List')}`;
+    <hr>${item('data-grid="1"', S.grid, 'Grid')}${item('data-grid="0"', !S.grid, 'List')}
+    <hr><div class="ph">Appearance</div>${item('data-look="system"', S.appearance === 'system', 'Automatic')}${item('data-look="light"', S.appearance === 'light', 'Light')}${item('data-look="dark"', S.appearance === 'dark', 'Dark')}`;
   pop.style.top = (r.bottom + 6) + 'px';
   pop.style.right = Math.max(8, window.innerWidth - r.right) + 'px';
   document.body.appendChild(pop);
@@ -280,6 +291,7 @@ function showSortMenu() {
   });
   pop.querySelectorAll('[data-asc]').forEach(b => b.onclick = () => { S.asc = b.dataset.asc === '1'; setPref('asc', S.asc); done(); });
   pop.querySelectorAll('[data-grid]').forEach(b => b.onclick = () => { S.grid = b.dataset.grid === '1'; setPref('grid', S.grid); done(); });
+  pop.querySelectorAll('[data-look]').forEach(b => b.onclick = () => { S.appearance = b.dataset.look; setPref('appearance', S.appearance); applyAppearance(); done(); });
 }
 document.addEventListener('click', () => {
   if (S.sortOpen) { S.sortOpen = false; document.querySelector('.sortpop')?.remove(); render(); }
@@ -439,7 +451,7 @@ async function openBook(id) {
   reading = true;
   await openReader(b, {
     onProgress: pos => { S.progress[pos.bookId] = pos; },
-    onClose: () => { reading = false; if (updateWaiting) location.reload(); else render(); },
+    onClose: () => { reading = false; if (updateWaiting) location.reload(); else { applyAppearance(); render(); } },
   });
 }
 
@@ -458,6 +470,7 @@ addEventListener('resize', () => {
     return;
   }
   lastWide = window.innerWidth >= 600;
+  applyAppearance();
   render();
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     const hadController = !!navigator.serviceWorker.controller;

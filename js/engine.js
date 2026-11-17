@@ -30,6 +30,7 @@ function engine(flip) {
     c.push('body *{color:inherit' + imp + ';background-color:transparent' + imp + ';}');
     c.push('a,a *{color:' + cfg.link + imp + ';}');
     c.push('p,li,blockquote,dd,dt,div{line-height:' + cfg.lineHeight + imp + ';}');
+    if (cfg.paraSpacing != null) c.push('p{margin-top:0' + imp + ';margin-bottom:' + cfg.paraSpacing + 'em' + imp + ';}');
     c.push('p{text-align:' + (cfg.justify ? 'justify' : 'start') + imp + ';-webkit-hyphens:' + hy + imp + ';hyphens:' + hy + imp + ';}');
     c.push('img,svg,video{max-width:100%' + imp + ';height:auto;}');
     c.push('img,figure,table,pre{-webkit-column-break-inside:avoid;break-inside:avoid;}');

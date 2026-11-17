@@ -25,7 +25,9 @@ export const FONTS = [
   ['avenir', 'Avenir Next', '"Avenir Next", Avenir, "Segoe UI", sans-serif'],
   ['menlo', 'Menlo', 'ui-monospace, Menlo, Consolas, monospace'],
 ];
-const DEFAULTS = { theme: 'system', font: 'newYork', size: 19, line: 1.5, margin: 24, justify: true, hyphenate: true, mode: 'paged', spread: true, gutter: 64, animate: true };
+// Space between paragraphs, in ems. 'orig' keeps the book's own spacing.
+const PARA = [['orig', 'Original'], [0, 'None'], [0.5, 'Small'], [1, 'Medium'], [1.6, 'Large']];
+const DEFAULTS = { theme: 'system', font: 'newYork', size: 19, line: 1.5, margin: 24, justify: true, hyphenate: true, mode: 'paged', spread: true, gutter: 64, animate: true, paraSpacing: null };
 
 function loadSettings() {
   try { return Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem('booknest.settings') || '{}')); }
@@ -33,7 +35,11 @@ function loadSettings() {
 }
 function saveSettings(s) { try { localStorage.setItem('booknest.settings', JSON.stringify(s)); } catch (e) { /* ignore */ } }
 
-const prefersDark = () => matchMedia('(prefers-color-scheme: dark)').matches;
+// "Auto" follows the library's appearance (Light/Dark), or the phone when that's Automatic.
+const prefersDark = () => {
+  const t = document.documentElement.dataset.theme;
+  return t ? t === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+};
 function theme(s) { return s.theme === 'system' ? (prefersDark() ? THEMES.dark : THEMES.light) : THEMES[s.theme]; }
 
 /** Two pages side by side when the screen is wide, e.g. an unfolded iPhone Duo or landscape. */
@@ -145,7 +151,7 @@ export async function openReader(record, { onClose, onProgress }) {
     const font = FONTS.find(f => f[0] === settings.font) || FONTS[1];
     return { bg: t.bg, fg: t.fg, link: t.link, font: font[2], fontSize: settings.size, lineHeight: settings.line,
              margin: settings.margin, marginV: 28, justify: settings.justify, hyphenate: settings.hyphenate,
-             mode: settings.mode, spread: spreadNow(), gutter: settings.gutter, animate: settings.animate !== false,
+             mode: settings.mode, spread: spreadNow(), gutter: settings.gutter, animate: settings.animate !== false, paraSpacing: settings.paraSpacing,
              dark: [THEMES.gray, THEMES.dark, THEMES.black].includes(t) };
   }
 
@@ -333,6 +339,8 @@ export async function openReader(record, { onClose, onProgress }) {
       <div class="ctl"><span class="grow">Size</span><span class="v">${st.size} pt</span><span class="stepper"><button id="szDown" aria-label="Smaller text">A−</button><button id="szUp" aria-label="Larger text">A+</button></span></div>
       <div class="ctl"><label for="lnR">Spacing</label><input type="range" id="lnR" min="1.1" max="2.2" step="0.05" value="${st.line}"><span class="v">${st.line.toFixed(2)}</span></div>
       <div class="ctl"><label for="mgR">Margins</label><input type="range" id="mgR" min="8" max="64" step="2" value="${st.margin}"><span class="v">${st.margin} pt</span></div>
+      <div class="ctl"><span class="grow">Paragraph spacing</span></div>
+      <div class="segm" role="group" aria-label="Paragraph spacing">${PARA.map(([v, l]) => `<button data-para="${v}" aria-pressed="${String(st.paraSpacing ?? 'orig') === String(v)}">${l}</button>`).join('')}</div>
       <div class="ctl"><span class="grow">Justify text</span><button class="toggle" role="switch" id="jsT" aria-checked="${st.justify}" aria-label="Justify text"></button></div>
       <div class="ctl"><span class="grow">Hyphenation</span><button class="toggle" role="switch" id="hyT" aria-checked="${st.hyphenate}" aria-label="Hyphenation"></button></div>
       <div class="lbl">Layout</div>
@@ -356,6 +364,7 @@ export async function openReader(record, { onClose, onProgress }) {
     sh.querySelectorAll('[data-theme-k]').forEach(b => b.onclick = () => set('theme', b.dataset.themeK, true));
     sh.querySelectorAll('[data-font]').forEach(b => b.onclick = () => set('font', b.dataset.font, true));
     sh.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => set('mode', b.dataset.mode, true));
+    sh.querySelectorAll('[data-para]').forEach(b => b.onclick = () => set('paraSpacing', b.dataset.para === 'orig' ? null : +b.dataset.para, true));
     const on = (id, fn) => { const el = $(id); if (el) el.onclick = fn; };
     on('szDown', () => set('size', Math.max(12, st.size - 1), true));
     on('szUp', () => set('size', Math.min(40, st.size + 1), true));
@@ -388,7 +397,7 @@ export async function openReader(record, { onClose, onProgress }) {
     root.hidden = true;
     root.innerHTML = '';
     document.body.classList.remove('reading');
-    document.querySelector('meta[name=theme-color]')?.setAttribute('content', '#000000');
+
     onClose?.();
   }
   const onVis = () => { if (document.visibilityState === 'hidden') persist(true); };
