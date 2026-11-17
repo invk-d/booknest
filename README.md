@@ -1,0 +1,34 @@
+# BookNest (web app)
+
+<img src="icons/icon-192.png" width="96" alt="BookNest icon: a white open book on black">
+
+An eReader with folders. It runs in Safari and can be added to your iPhone Home Screen, where it opens full-screen like a regular app and works offline. It doesn't need the App Store.
+
+## Features
+- **Folders inside folders.** Create, rename, move and delete them. Press and hold a book or folder for options.
+- **Add books from the Files app:** EPUB, PDF, TXT and Markdown. On a computer you can also drag files onto the window.
+- **Sort** by Title (ignoring "The", "A" and "An"), Author (last name first), File Name, Date Added or Recently Read. Grid or list view, and search by title, author or file name.
+- **Remembers where you stopped in every book**, with a "Continue Reading" shelf and a % read bar on each book.
+- **Reader:**
+  - Themes: Auto, Light, Sepia, Gray, Dark and Black.
+  - Fonts and text: 9 fonts, plus size, line spacing, margins, justification and hyphenation.
+  - Pages or scrolling, a table of contents and a progress slider.
+  - Tap the left or right edge, swipe, or use the arrow keys to turn pages. Tap the middle to show the controls.
+- **iPhone Duo:**
+  - Folded, it's a phone layout. Unfolded (any screen 600 or more points wide), you get a folder sidebar and a two-page book spread with an adjustable center gutter.
+  - Folding or unfolding mid-book keeps the same passage on screen.
+
+Your books are stored in the browser's storage on your device. They aren't uploaded anywhere.
+
+## Put it online with GitHub Pages
+1. Create a repository on GitHub (for example `booknest`) and upload everything in this folder to it.
+2. In the repository, go to **Settings → Pages**. Under "Build and deployment", choose **Deploy from a branch**, then pick `main` and `/ (root)`, and tap **Save**.
+3. After about a minute the app is live at `https://<your-username>.github.io/booknest/`.
+
+## Add it to your iPhone Home Screen
+Open that address in **Safari**, tap **Share**, then tap **Add to Home Screen**.
+
+## Notes
+- Add books from inside the Home Screen app, not from a Safari tab. iOS keeps the storage for the two separate.
+- When you change any app file, bump `VERSION` in `sw.js` so phones pick up the update.
+- Bundled libraries: [JSZip](https://stuk.github.io/jszip/) (MIT) and [pdf.js](https://mozilla.github.io/pdf.js/) (Apache 2.0). Their licenses are in `vendor/`.
