@@ -20,6 +20,13 @@ An eReader with folders. It runs in Safari and can be added to your iPhone Home 
 
 Your books are stored in the browser's storage on your device. They aren't uploaded anywhere.
 
+## Importing a whole folder
+Tap **+ → Import Folder…**.
+- **iPhone:** in the Files app, press and hold the folder and tap **Compress**, then choose the `.zip` it makes. Choosing a `.zip` with **Add Books** works too.
+- **Computer:** pick the folder directly, or drop a `.zip` onto the window.
+
+BookNest recreates the folder and all its subfolders inside the folder you're viewing, and ignores files that aren't books. Importing the same folder again merges into the existing folders and only adds books you don't already have.
+
 ## Backups
 Tap **⋯ → Back Up Library…**, then choose **Save to Files** on the Share sheet. The backup is a small `.json` file holding your folders, book list, reading progress and settings. The book files themselves stay in the Files app and are never touched.
 

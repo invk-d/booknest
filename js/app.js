@@ -1,6 +1,6 @@
 // BookNest library: folders, books, sorting, and opening the reader.
 import { db } from './db.js';
-import { importFiles } from './importer.js';
+import { importFiles, expandSources } from './importer.js';
 import { makeBackup, saveBackup, readBackup, restoreBackup } from './backup.js';
 import { openReader } from './reader.js';
 import { esc, ICON, toast, actionSheet, askText, confirmDialog, onLongPress, setThemeColor } from './ui.js';
@@ -28,6 +28,9 @@ matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', applyApp
 const app = document.getElementById('app');
 const fileInput = document.getElementById('fileInput');
 const restoreInput = document.getElementById('restoreInput');
+const folderInput = document.getElementById('folderInput');
+const zipInput = document.getElementById('zipInput');
+const isIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 let relinkId = null;              // set while picking the file for one particular book
 const coverURLs = new Map();      // bookId -> object URL | null
 
@@ -151,13 +154,13 @@ function contentsHTML() {
 }
 
 function welcomeHTML() {
-  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const ios = isIOS();
   const installed = navigator.standalone || matchMedia('(display-mode: standalone)').matches;
   return `<div class="welcome">
     <div class="logo">${ICON.book}</div>
     <h2>Welcome to BookNest</h2>
     <p>Add EPUB, PDF or text files from the Files app, then organise them into folders.</p>
-    <div class="empty-btns"><button class="btn" data-act="add">Add Books</button><button class="btn ghost" data-act="newfolder">New Folder</button></div>
+    <div class="empty-btns"><button class="btn" data-act="add">Add Books</button><button class="btn ghost" data-act="importfolder">Import Folder</button><button class="btn ghost" data-act="newfolder">New Folder</button></div>
     <button class="linkbtn" data-act="restore">Restore from a backup</button>
     ${ios && !installed ? `<div class="install"><b>Put BookNest on your Home Screen</b><span>In Safari, tap the Share button <svg width="14" height="17" viewBox="0 0 14 17" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-label="Share"><path d="M7 11V1.5M3.5 5 7 1.5 10.5 5"/><path d="M4.5 7.5H2.5v8h9v-8h-2"/></svg>, then <b>Add to Home Screen</b>.</span></div>` : ''}
   </div>`;
@@ -267,11 +270,13 @@ function bind() {
   const add = document.getElementById('addBtn');
   if (add) add.onclick = () => actionSheet(null, [
     { label: 'Add Books…', action: () => fileInput.click() },
+    { label: 'Import Folder…', action: importFolder },
     { label: 'New Folder…', action: newFolder },
   ]);
   const more = document.getElementById('moreBtn');
   if (more) more.onclick = backupMenu;
   app.querySelectorAll('[data-act="restore"]').forEach(b => b.onclick = () => restoreInput.click());
+  app.querySelectorAll('[data-act="importfolder"]').forEach(b => b.onclick = importFolder);
   const sb = document.getElementById('sortBtn');
   if (sb) sb.onclick = e => { e.stopPropagation(); S.sortOpen = !S.sortOpen; render(); };
   if (S.sortOpen) showSortMenu();
@@ -442,6 +447,28 @@ async function addFiles(files) {
   const t = toast(`Adding ${files.length} ${files.length === 1 ? 'book' : 'books'}…`, 600000);
   const forBook = relinkId; relinkId = null;
   if (forBook) files = files.slice(0, 1);
+  let imported = null, ignored = [];
+  if (!forBook && files.some(f => /\.zip$/i.test(f.name) || f.webkitRelativePath)) {
+    t.textContent = 'Reading folder…';
+    try {
+      const { items, skipped } = await expandSources(files);
+      ignored = skipped;
+      const made = new Set(), tops = new Set();
+      files = [];
+      for (const it of items) {
+        let parent = S.folderId;
+        for (const name of it.dirs) parent = await ensureFolder(parent, name, made);
+        if (it.dirs.length) tops.add(it.dirs[0]);
+        files.push({ file: it.file, folderId: parent });
+      }
+      imported = { made: made.size, tops: [...tops] };
+      t.textContent = `Adding ${files.length} ${files.length === 1 ? 'book' : 'books'}…`;
+    } catch (e) {
+      t.remove();
+      toast('Couldn’t read that folder: ' + (e.message || e), 5000);
+      return;
+    }
+  }
   const res = await importFiles(files, S.folderId, (done, total) => { t.textContent = `Adding books… ${done} of ${total}`; }, forBook);
   t.remove();
   for (const b of res.relinked) { const u = coverURLs.get(b.id); if (u) URL.revokeObjectURL(u); coverURLs.delete(b.id); }
@@ -451,11 +478,43 @@ async function addFiles(files) {
   if (res.added.length) parts.push(`Added ${res.added.length} ${res.added.length === 1 ? 'book' : 'books'}`);
   if (res.relinked.length) parts.push(`${res.relinked.length} ${res.relinked.length === 1 ? 'book is' : 'books are'} back in place`);
   if (res.already.length) parts.push(`${res.already.length} already in your library`);
+  if (imported) {
+    const name = imported.tops.length === 1 ? `“${imported.tops[0]}”` : 'the folder';
+    parts.unshift(`Imported ${name}${imported.made ? ` with ${imported.made} ${imported.made === 1 ? 'folder' : 'folders'}` : ''}`);
+  }
   if (res.skipped.length) parts.push(`skipped ${res.skipped.length} unsupported (EPUB, PDF, TXT and MD only)`);
+  if (ignored.length) parts.push(`ignored ${ignored.length} other ${ignored.length === 1 ? 'file' : 'files'}`);
   if (res.failed.length) parts.push(`couldn't read ${res.failed.map(f => f.name).join(', ')}`);
-  toast(parts.join('; ') || 'Nothing added', 4000);
+  toast(parts.map((x, i) => i ? x[0].toLowerCase() + x.slice(1) : x).join('; ') || 'Nothing added', 4500);
 }
 fileInput.onchange = () => { addFiles(fileInput.files); fileInput.value = ''; };
+folderInput.onchange = () => { addFiles(folderInput.files); folderInput.value = ''; };
+zipInput.onchange = () => {
+  const f = zipInput.files?.[0];
+  zipInput.value = '';
+  if (!f) return;
+  if (!/\.zip$/i.test(f.name)) { toast('Choose the .zip file made by Compress in the Files app.', 4500); return; }
+  addFiles([f]);
+};
+
+/** Finds a subfolder by name (so importing the same folder again merges into it), or creates it. */
+async function ensureFolder(parentId, name, made) {
+  const existing = S.folders.find(f => (f.parentId ?? null) === parentId && f.name.toLowerCase() === name.toLowerCase());
+  if (existing) return existing.id;
+  const f = { id: newId(), name, parentId };
+  await db.put('folders', f);
+  S.folders.push(f);
+  made.add(f.id);
+  return f.id;
+}
+
+function importFolder() {
+  // Computers can pick a folder directly. iPhone's picker can't, but Files can zip a folder.
+  if (!isIOS() && 'webkitdirectory' in folderInput) { folderInput.click(); return; }
+  confirmDialog('Import a folder',
+    'In the Files app, press and hold the folder and tap Compress. Then choose the .zip file it makes. BookNest rebuilds the folder with all its subfolders and books.',
+    'Choose .zip…', false, () => { zipInput.click(); return true; });
+}
 // iOS gives no event when the picker is cancelled; forget a pending relink once focus returns.
 window.addEventListener('focus', () => setTimeout(() => { if (!fileInput.files?.length) relinkId = null; }, 1000));
 

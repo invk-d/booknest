@@ -92,8 +92,44 @@ async function describe(file, format) {
   return info;
 }
 
+const JUNK = /(^|\/)(__MACOSX|\.)/;   // macOS metadata and hidden files inside zips/folders
+
 /**
- * Imports files into a folder.
+ * Turns a chosen folder (or a .zip of one) into a list of { file, dirs } where `dirs` is the
+ * folder path inside it, e.g. ['Fiction', 'Sci-Fi']. Files that aren't books are counted in
+ * `skipped`. Accepts File objects from a folder picker (webkitRelativePath) and .zip files.
+ */
+export async function expandSources(files) {
+  const items = [], skipped = [];
+  for (const f of files) {
+    if (/\.zip$/i.test(f.name)) {
+      const zip = await window.JSZip.loadAsync(f);
+      const base = f.name.replace(/\.zip$/i, '');
+      const entries = Object.values(zip.files).filter(e => !e.dir && !JUNK.test(e.name));
+      // Files' "Compress" puts everything inside one top-level folder; otherwise use the zip's name.
+      const tops = new Set(entries.map(e => e.name.split('/')[0]));
+      const wrapped = entries.length && entries.every(e => e.name.includes('/')) && tops.size === 1;
+      for (const e of entries) {
+        const parts = e.name.split('/').filter(Boolean);
+        const name = parts.pop();
+        if (!formatOf(name)) { skipped.push(name); continue; }
+        const blob = await e.async('blob');
+        items.push({ file: new File([blob], name, { lastModified: e.date ? e.date.getTime() : Date.now() }),
+                     dirs: wrapped ? parts : [base, ...parts] });
+      }
+    } else {
+      const rel = f.webkitRelativePath || '';
+      if (JUNK.test(rel)) continue;
+      if (!formatOf(f.name)) { skipped.push(f.name); continue; }
+      items.push({ file: f, dirs: rel ? rel.split('/').slice(0, -1) : [] });
+    }
+  }
+  return { items, skipped };
+}
+
+/**
+ * Imports files into a folder. `files` may hold File objects or { file, folderId } items
+ * (folder imports put each book in its own subfolder).
  * A file that belongs to a book already in the library but missing its file (e.g. after
  * restoring a backup) is reattached to that book, keeping its folder and reading progress.
  * relinkId: attach the (single) file to this book, whatever it is.
@@ -106,7 +142,9 @@ export async function importFiles(files, folderId, onProgress, relinkId = null) 
   const books = await db.all('books');
   const haveFile = new Set(await db.keys('files'));
   let done = 0;
-  for (const file of files) {
+  for (const item of files) {
+    const file = item instanceof Blob ? item : item.file;
+    const targetFolder = item instanceof Blob ? folderId : item.folderId;
     const format = formatOf(file.name);
     if (!format) { skipped.push(file.name); onProgress?.(++done, files.length); continue; }
     try {
@@ -128,7 +166,7 @@ export async function importFiles(files, folderId, onProgress, relinkId = null) 
       const info = await describe(file, format);
       const book = {
         id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2),
-        folderId: folderId ?? null,
+        folderId: targetFolder ?? null,
         title: info.title, author: info.author, authorSort: info.authorSort,
         format, fileName: file.name, size: file.size,
         fileModified: file.lastModified || Date.now(), added: Date.now(), fp,

@@ -34,6 +34,7 @@ export function setThemeColor(color) {
 }
 
 export function toast(msg, ms = 2600) {
+  document.querySelectorAll('.toast').forEach(old => old.remove());   // one message at a time
   const t = document.createElement('div');
   t.className = 'toast';
   t.setAttribute('role', 'status');
