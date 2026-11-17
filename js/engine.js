@@ -3,10 +3,12 @@
 // screen is wide, e.g. an unfolded iPhone Duo) and moves between pages with a transform.
 // The position is a character offset of the first visible character, which doesn't depend
 // on layout, so changing fonts or folding/unfolding keeps the same passage on screen.
-function engine() {
+import { bookFlip } from './flip.js';
+
+function engine(flip) {
   if (window.BookNest) return;
   var S = {}; window.BookNest = S;
-  var cfg = null, page = 0, pageCount = 1, offset = 0, styleEl = null, bound = false, scrollTimer = null;
+  var cfg = null, page = 0, pageCount = 1, offset = 0, styleEl = null, bound = false, scrollTimer = null, flipping = null;
 
   function post(m) { try { window.parent.__booknest(m); } catch (e) {} }
   function paged() { return cfg.mode !== 'scroll'; }
@@ -217,21 +219,43 @@ function engine() {
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { if (cfg) relayout(); });
   }
 
+  // Moves to another page, with the page-turn animation when it's switched on.
+  function turn(to, dir) {
+    if (flipping) { flipping.finish(); flipping = null; }
+    var from = page;
+    setPage(to);
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (page === from || !cfg.animate || reduce || !flip) { report(true); return; }
+    var k = metrics();
+    var view = function (p) {
+      return function () {
+        var b = document.body.cloneNode(true);   // a <body> copy, so the book's own body styles still apply
+        b.removeAttribute('id');
+        b.style.transform = 'translateX(' + (-p * k.vw) + 'px)';
+        return b;
+      };
+    };
+    var f = flip({ host: document.documentElement, position: 'fixed', W: k.vw, H: k.vh, spread: k.cols === 2,
+                   dir: dir, from: view(from), to: view(page), bg: cfg.bg, duration: cfg.spread ? 560 : 480 });
+    flipping = f;
+    f.done.then(function () { if (flipping === f) flipping = null; report(true); });
+  }
+
   S.setup = function (config, target) { cfg = config; layout(); bind(); go(target); return true; };
-  S.apply = function (config) { cfg = config; relayout(); return true; };
+  S.apply = function (config) { if (flipping) { flipping.finish(); flipping = null; } cfg = config; relayout(); return true; };
   S.go = function (t) { go(t); return true; };
   S.next = function () {
-    if (paged()) { if (page >= pageCount - 1) return false; setPage(page + 1); report(true); return true; }
+    if (paged()) { if (page >= pageCount - 1) return false; turn(page + 1, 1); return true; }
     var de = document.documentElement;
     if (de.scrollTop >= scrollMax() - 2) return false;
     de.scrollTop += window.innerHeight - 60; return true;
   };
   S.prev = function () {
-    if (paged()) { if (page <= 0) return false; setPage(page - 1); report(true); return true; }
+    if (paged()) { if (page <= 0) return false; turn(page - 1, -1); return true; }
     var de = document.documentElement;
     if (de.scrollTop <= 2) return false;
     de.scrollTop -= window.innerHeight - 60; return true;
   };
 }
 
-export const ENGINE_SOURCE = '(' + engine.toString() + ')();';
+export const ENGINE_SOURCE = '(' + engine.toString() + ')(' + bookFlip.toString() + ');';

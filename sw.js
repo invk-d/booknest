@@ -1,6 +1,6 @@
 // Offline support: the app's own files are cached so BookNest opens without a connection.
 // Bump VERSION whenever any of these files change, so phones pick up the update.
-const VERSION = 'booknest-v1';
+const VERSION = 'booknest-v2';
 const ASSETS = [
   './',
   './index.html',
@@ -10,6 +10,7 @@ const ASSETS = [
   './js/db.js',
   './js/engine.js',
   './js/epub.js',
+  './js/flip.js',
   './js/importer.js',
   './js/reader.js',
   './js/textbook.js',
@@ -23,7 +24,7 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', event => {
-  event.waitUntil(caches.open(VERSION).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
+  event.waitUntil(caches.open(VERSION).then(c => c.addAll(ASSETS.map(u => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', event => {

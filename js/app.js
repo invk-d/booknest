@@ -432,14 +432,14 @@ document.addEventListener('drop', e => {
 });
 
 // ---------- reader ----------
-let reading = false;
+let reading = false, updateWaiting = false;
 async function openBook(id) {
   const b = S.books.find(x => x.id === id);
   if (!b || reading) return;
   reading = true;
   await openReader(b, {
     onProgress: pos => { S.progress[pos.bookId] = pos; },
-    onClose: () => { reading = false; render(); },
+    onClose: () => { reading = false; if (updateWaiting) location.reload(); else render(); },
   });
 }
 
@@ -460,7 +460,13 @@ addEventListener('resize', () => {
   lastWide = window.innerWidth >= 600;
   render();
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+    const hadController = !!navigator.serviceWorker.controller;
     navigator.serviceWorker.register('./sw.js').catch(() => {});
+    // A new version was installed: reload to use it, but never in the middle of reading.
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!hadController) return;
+      if (reading) updateWaiting = true; else location.reload();
+    });
   }
 })();
 

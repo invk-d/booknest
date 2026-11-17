@@ -4,6 +4,7 @@ import { openEpub } from './epub.js';
 import { openText, decodeText } from './textbook.js';
 import { loadPdfJs } from './importer.js';
 import { ENGINE_SOURCE } from './engine.js';
+import { bookFlip } from './flip.js';
 import { esc, ICON } from './ui.js';
 
 export const THEMES = {
@@ -24,7 +25,7 @@ export const FONTS = [
   ['avenir', 'Avenir Next', '"Avenir Next", Avenir, "Segoe UI", sans-serif'],
   ['menlo', 'Menlo', 'ui-monospace, Menlo, Consolas, monospace'],
 ];
-const DEFAULTS = { theme: 'system', font: 'newYork', size: 19, line: 1.5, margin: 24, justify: true, hyphenate: true, mode: 'paged', spread: true, gutter: 64 };
+const DEFAULTS = { theme: 'system', font: 'newYork', size: 19, line: 1.5, margin: 24, justify: true, hyphenate: true, mode: 'paged', spread: true, gutter: 64, animate: true };
 
 function loadSettings() {
   try { return Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem('booknest.settings') || '{}')); }
@@ -144,7 +145,7 @@ export async function openReader(record, { onClose, onProgress }) {
     const font = FONTS.find(f => f[0] === settings.font) || FONTS[1];
     return { bg: t.bg, fg: t.fg, link: t.link, font: font[2], fontSize: settings.size, lineHeight: settings.line,
              margin: settings.margin, marginV: 28, justify: settings.justify, hyphenate: settings.hyphenate,
-             mode: settings.mode, spread: spreadNow(), gutter: settings.gutter };
+             mode: settings.mode, spread: spreadNow(), gutter: settings.gutter, animate: settings.animate !== false };
   }
 
   window.__booknest = msg => {
@@ -214,8 +215,14 @@ export async function openReader(record, { onClose, onProgress }) {
     const start = p % 2 === 1 ? p : p - 1;
     return [start, start + 1].filter(i => i < R.pdf.numPages);
   }
-  let renderToken = 0;
-  async function renderPDF() {
+  let renderToken = 0, pdfFlip = null;
+  function copyBox(el) {
+    const c = el.cloneNode(true);
+    const src = el.querySelectorAll('canvas'), dst = c.querySelectorAll('canvas');
+    src.forEach((cv, i) => dst[i].getContext('2d').drawImage(cv, 0, 0));
+    return c;
+  }
+  async function renderPDF(dir) {
     const token = ++renderToken;
     const pages = pdfGroup(R.pdfPage);
     const W = stage.clientWidth, H = stage.clientHeight, pad = 12;
@@ -238,27 +245,38 @@ export async function openReader(record, { onClose, onProgress }) {
       await page.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
       if (token !== renderToken) return;
     }
+    if (pdfFlip) { pdfFlip.finish(); pdfFlip = null; }
+    const old = stage.querySelector('.pdf-spread');
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const fromCopy = dir && old && settings.animate !== false && !reduce ? copyBox(old) : null;
     stage.innerHTML = '';
     stage.appendChild(box);
+    if (fromCopy) {
+      const f = bookFlip({ host: stage, position: 'absolute', W: stage.clientWidth, H: stage.clientHeight,
+                           spread: spreadNow(), dir, from: () => copyBox(fromCopy), to: () => copyBox(box),
+                           bg: theme(settings).bg, duration: spreadNow() ? 560 : 480 });
+      pdfFlip = f;
+      f.done.then(() => { if (pdfFlip === f) pdfFlip = null; });
+    }
   }
-  function pdfGo(p) {
+  function pdfGo(p, dir) {
     R.pdfPage = Math.max(0, Math.min(p, R.pdf.numPages - 1));
     R.overall = R.pdf.numPages > 1 ? R.pdfPage / (R.pdf.numPages - 1) : 1;
     updateLocation();
     persist();
-    renderPDF();
+    renderPDF(dir);
   }
 
   // ---------- navigation ----------
   function next() {
     hideChrome();
-    if (isPDF) { const g = pdfGroup(R.pdfPage); if (g[g.length - 1] < R.pdf.numPages - 1) pdfGo(g[g.length - 1] + 1); return; }
+    if (isPDF) { const g = pdfGroup(R.pdfPage); if (g[g.length - 1] < R.pdf.numPages - 1) pdfGo(g[g.length - 1] + 1, 1); return; }
     if (!R.ready) return;
     if (!R.frame.contentWindow.BookNest.next() && R.chapter < R.book.spine.length - 1) loadChapter(R.chapter + 1, { kind: 'start' });
   }
   function prev() {
     hideChrome();
-    if (isPDF) { const g = pdfGroup(R.pdfPage); if (g[0] > 0) pdfGo(pdfGroup(g[0] - 1)[0]); return; }
+    if (isPDF) { const g = pdfGroup(R.pdfPage); if (g[0] > 0) pdfGo(pdfGroup(g[0] - 1)[0], -1); return; }
     if (!R.ready) return;
     if (!R.frame.contentWindow.BookNest.prev() && R.chapter > 0) loadChapter(R.chapter - 1, { kind: 'end' });
   }
@@ -320,6 +338,8 @@ export async function openReader(record, { onClose, onProgress }) {
     sh.innerHTML = `<div class="grab"></div><div class="sh"><b>Appearance</b><button id="shDone">Done</button></div>
       <div class="lbl">Theme</div><div class="swatches">${sw('system')}${Object.entries(THEMES).map(([k, t]) => sw(k, t)).join('')}</div>
       ${text}
+      <div class="lbl">Page Turn</div>
+      <div class="ctl"><span class="grow">Page-turn animation</span><button class="toggle" role="switch" id="anT" aria-checked="${st.animate !== false}" aria-label="Page-turn animation"></button></div>
       <div class="lbl">iPhone Duo</div>
       <div class="ctl"><span class="grow">Two-page spread when unfolded</span><button class="toggle" role="switch" id="spT" aria-checked="${st.spread}" aria-label="Two-page spread when unfolded"></button></div>
       ${st.spread && !isPDF ? `<div class="ctl"><label for="guR">Center gutter</label><input type="range" id="guR" min="24" max="140" step="4" value="${st.gutter}"><span class="v">${st.gutter} pt</span></div>` : ''}
@@ -340,6 +360,7 @@ export async function openReader(record, { onClose, onProgress }) {
     on('jsT', () => set('justify', !st.justify, true));
     on('hyT', () => set('hyphenate', !st.hyphenate, true));
     on('spT', () => set('spread', !st.spread, true));
+    on('anT', () => set('animate', st.animate === false, true));
     const live = (id, k, fmt) => {
       const r = $(id); if (!r) return;
       let t;
