@@ -23,7 +23,7 @@
       try { a = JSON.parse(localStorage.getItem('booknest.appearance') || '"system"'); } catch (e) {}
       if (a !== 'system') document.documentElement.dataset.theme = a;
       var dark = a === 'dark' || (a === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
-      document.querySelector('meta[name=theme-color]').setAttribute('content', dark ? '#000000' : '#f2f2f7');
+      document.querySelector('meta[name=theme-color]').setAttribute('content', dark ? '#000000' : '#ffffff');
     })();
   </script>
   <script src="vendor/jszip.min.js" defer></script>

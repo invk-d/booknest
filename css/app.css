@@ -1,9 +1,10 @@
 /* BookNest — iOS-style library with a reader overlay.
    Narrow (folded phone): one column, drill into folders. Wide (unfolded / iPad / desktop): sidebar + detail. */
 :root {
-  --bg: #f2f2f7; --surface: #ffffff; --fg: #111318; --muted: #6c7380;
-  --hair: rgba(60, 60, 67, .18); --accent: #2f6fe0; --accent-soft: rgba(47, 111, 224, .12);
-  --danger: #e5383b; --sheet: #ffffff;
+  /* Light: white page, with rows and cards in a soft grey so they still stand out. */
+  --bg: #ffffff; --surface: #f2f2f7; --fg: #111318; --muted: #6c7380;
+  --hair: rgba(60, 60, 67, .16); --accent: #2f6fe0; --accent-soft: rgba(47, 111, 224, .12);
+  --danger: #e5383b; --sheet: #ffffff; --raised: #ffffff;
   --ui: -apple-system, "SF Pro Text", system-ui, "Segoe UI", Roboto, sans-serif;
   --serif: "New York", ui-serif, Georgia, "Times New Roman", serif;
   --st: env(safe-area-inset-top, 0px); --sb: env(safe-area-inset-bottom, 0px);
@@ -14,11 +15,11 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) { --bg: #000000; --surface: #1c1c1e; --fg: #f2f2f7; --muted: #98989f;
           --hair: rgba(84, 84, 88, .6); --accent: #6d9bff; --accent-soft: rgba(109, 155, 255, .16);
-          --danger: #ff5c5f; --sheet: #2c2c2e; color-scheme: dark; }
+          --danger: #ff5c5f; --sheet: #2c2c2e; --raised: #636366; color-scheme: dark; }
 }
 :root[data-theme="dark"] { --bg: #000000; --surface: #1c1c1e; --fg: #f2f2f7; --muted: #98989f;
           --hair: rgba(84, 84, 88, .6); --accent: #6d9bff; --accent-soft: rgba(109, 155, 255, .16);
-          --danger: #ff5c5f; --sheet: #2c2c2e; color-scheme: dark; }
+          --danger: #ff5c5f; --sheet: #2c2c2e; --raised: #636366; color-scheme: dark; }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); font-family: var(--ui); font-size: 16px; }
@@ -212,7 +213,7 @@ body.dropping::after { content: "Drop books to add them"; position: fixed; inset
 .toggle[aria-checked="true"]::after { transform: translateX(20px); }
 .segm { display: flex; background: color-mix(in srgb, var(--muted) 14%, transparent); border-radius: 10px; padding: 2px; }
 .segm button { flex: 1; min-width: 0; padding: 7px 2px; border-radius: 8px; font-size: 14px; white-space: nowrap; }
-.segm button[aria-pressed="true"] { background: var(--surface); box-shadow: 0 1px 3px rgba(0,0,0,.15); font-weight: 600; }
+.segm button[aria-pressed="true"] { background: var(--raised); box-shadow: 0 1px 3px rgba(0,0,0,.15); font-weight: 600; }
 .sheet .hint { font-size: 13px; color: var(--muted); line-height: 1.45; margin: 8px 0 0; }
 .toc { display: flex; flex-direction: column; }
 .toc-row { text-align: left; padding: 12px; border-radius: 10px; font-size: 16px; line-height: 1.3; }

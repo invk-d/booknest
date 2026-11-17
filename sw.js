@@ -1,6 +1,6 @@
 // Offline support: the app's own files are cached so BookNest opens without a connection.
 // Bump VERSION whenever any of these files change, so phones pick up the update.
-const VERSION = 'booknest-v10';
+const VERSION = 'booknest-v11';
 const ASSETS = [
   './',
   './index.html',
