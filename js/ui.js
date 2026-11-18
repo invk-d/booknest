@@ -63,7 +63,7 @@ export function toast(msg, ms = 2600) {
 export function actionSheet(title, items) {
   const wrap = document.createElement('div');
   wrap.className = 'as-wrap';
-  wrap.innerHTML = `<div class="as">
+  wrap.innerHTML = `<div class="as" tabindex="-1" role="menu">
       <div class="as-group">${title ? `<div class="as-title">${esc(title)}</div>` : ''}
       ${items.map((it, i) => `<button class="as-btn${it.destructive ? ' danger' : ''}" data-i="${i}">${esc(it.label)}</button>`).join('')}</div>
       <div class="as-group"><button class="as-btn cancel">Cancel</button></div></div>`;
@@ -76,7 +76,9 @@ export function actionSheet(title, items) {
     if (b.dataset.i != null) items[+b.dataset.i].action();
   });
   document.body.appendChild(wrap);
-  wrap.querySelector('button')?.focus();
+  // Focus the menu itself (for keyboard and screen readers) rather than its first option,
+  // which made iOS draw a focus ring around that option.
+  wrap.querySelector('.as').focus({ preventScroll: true });
 }
 
 /** Simple text-entry dialog. Resolves to the entered text, or null if cancelled. */
