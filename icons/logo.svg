@@ -7,6 +7,7 @@
     </linearGradient>
   </defs>
   <rect width="1024" height="1024" fill="#000000"/>
+  <g transform="translate(0 -28)">
   <g>
     <!-- page block under the open pages -->
     <path d="M150 330 L150 750 C290 716 420 724 512 792 C604 724 734 716 874 750 L874 330"
@@ -25,5 +26,6 @@
     <path d="M768 448 C704 434 634 438 578 462"/>
     <path d="M768 526 C704 512 634 516 578 540"/>
     <path d="M768 604 C714 592 664 594 624 610"/>
+  </g>
   </g>
 </svg>
