@@ -1,5 +1,7 @@
 // Plain text and Markdown books, split into chapters so they read like EPUBs.
 
+import { readableText } from './epub.js';
+
 const CHUNK = 30000;
 const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const inline = s => s
@@ -61,6 +63,9 @@ export function openText(text, markdown) {
     toc,
     async chapterDocument(i) {
       return new DOMParser().parseFromString(`<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>${chapters[i]}</body></html>`, 'text/html');
+    },
+    async chapterText(i) {
+      return readableText(new DOMParser().parseFromString(chapters[i], 'text/html').body);
     },
     resolveLink(from, href) {
       if (/^(https?:|mailto:)/i.test(href)) return { external: href };

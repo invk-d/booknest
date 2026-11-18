@@ -15,6 +15,8 @@ An eReader with folders. It runs in Safari and can be added to your iPhone Home 
   - Themes: Auto, Light, Sepia, Gray, Dark and Black.
   - Fonts and text: 9 fonts, plus size, line spacing, margins, justification and hyphenation.
   - Pages or scrolling, a table of contents and a progress slider.
+  - **Bookmarks:** tap the bookmark button to mark the page (a red ribbon shows on bookmarked pages; tap again to remove). See them all under Contents → Bookmarks.
+  - **Find:** tap the magnifier to search the whole book. Tap a match to jump to it highlighted, then step through matches with ‹ ›.
   - Tap the left or right edge, swipe, or use the arrow keys to turn pages. Tap the middle to show the controls.
 - **iPhone Duo:**
   - Folded, it's a phone layout. Unfolded (any screen 600 or more points wide), you get a folder sidebar and a two-page book spread with an adjustable center gutter.

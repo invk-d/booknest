@@ -9,6 +9,15 @@ const MIME = {
 };
 const ext = p => (p.split('.').pop() || '').toLowerCase();
 
+const BLOCKS = ['p', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'blockquote', 'pre', 'tr', 'td', 'th',
+                'dd', 'dt', 'figcaption', 'section', 'article', 'header', 'footer', 'br', 'hr'];
+/** Text of a document body for searching: no scripts/styles, and a line break after each block. */
+export function readableText(body) {
+  for (const tag of ['script', 'style']) for (const el of Array.from(body.getElementsByTagNameNS('*', tag))) el.remove();
+  for (const tag of BLOCKS) for (const el of Array.from(body.getElementsByTagNameNS('*', tag))) el.after('\n');
+  return body.textContent || '';
+}
+
 export function normalize(path) {
   const out = [];
   for (const part of path.split('/')) {
@@ -238,6 +247,14 @@ class EpubBook {
       }
     }
     return out;
+  }
+
+  /** The chapter's readable text (no scripts or styles), for searching. */
+  async chapterText(index) {
+    const raw = await this.zip.file(this.spine[index].path)?.async('string');
+    if (raw == null) return '';
+    const doc = parseXML(raw);
+    return readableText(first(doc, 'body') || doc.documentElement);
   }
 
   /** Where an in-book link points: another chapter (+ anchor) or an external URL. */

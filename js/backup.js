@@ -26,7 +26,7 @@ function settingsSnapshot() {
 
 /** Builds the backup. Also records fingerprints for older books that don't have one yet. */
 export async function makeBackup() {
-  const [folders, books, progress] = await Promise.all([db.all('folders'), db.all('books'), db.all('progress')]);
+  const [folders, books, progress, bookmarks] = await Promise.all([db.all('folders'), db.all('books'), db.all('progress'), db.all('bookmarks')]);
   for (const b of books) {
     if (b.fp) continue;
     const file = await db.get('files', b.id);
@@ -34,7 +34,7 @@ export async function makeBackup() {
   }
   const created = new Date();
   const data = { kind: KIND, version: 1, app: 'BookNest', created: created.toISOString(),
-                 folders, books, progress, settings: settingsSnapshot() };
+                 folders, books, progress, bookmarks, settings: settingsSnapshot() };
   const day = created.toISOString().slice(0, 10);
   const file = new File([JSON.stringify(data, null, 1)], `BookNest Backup ${day}.json`, { type: 'application/json' });
   return { file, books: books.length, folders: folders.length, withProgress: progress.length };
@@ -121,6 +121,16 @@ export async function restoreBackup(data) {
       await db.put('progress', { ...p, bookId: id });
       progressRestored++;
     }
+  }
+
+  // Bookmarks: combine with any already here (same bookmark id = same bookmark).
+  for (const bm of data.bookmarks || []) {
+    if (!bm || !bm.bookId || !idMap.has(bm.bookId) || !Array.isArray(bm.items)) continue;
+    const id = idMap.get(bm.bookId);
+    const mine = (await db.get('bookmarks', id)) || { bookId: id, items: [] };
+    const have = new Set(mine.items.map(x => x.id));
+    for (const it of bm.items) if (it && it.id && !have.has(it.id)) mine.items.push(it);
+    await db.put('bookmarks', mine);
   }
 
   try {

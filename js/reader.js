@@ -5,7 +5,7 @@ import { openText, decodeText } from './textbook.js';
 import { loadPdfJs } from './importer.js';
 import { ENGINE_SOURCE } from './engine.js';
 import { bookFlip } from './flip.js';
-import { esc, ICON, setThemeColor } from './ui.js';
+import { esc, ICON, setThemeColor, toast } from './ui.js';
 
 export const THEMES = {
   light: { bg: '#ffffff', fg: '#1c1c1e', link: '#3a3a3c', textLink: '#0a60d0', label: 'Light' },
@@ -53,6 +53,9 @@ export async function openReader(record, { onClose, onProgress }) {
     book: null, pdf: null, chapter: saved.chapter || 0, page: 0, pageCount: 1, chapterFrac: 0,
     overall: saved.fraction || 0, offset: saved.offset || 0, pdfPage: saved.page || 0,
     chrome: true, sheet: null, frame: null, ready: false, hideTimer: null, saveTimer: null, closed: false,
+    bookmarks: [],            // [{ id, chapter, offset, page, fraction, label, created }]
+    search: { q: '', results: [], done: true, token: 0 }, texts: new Map(),
+    find: null,               // { q, index } while stepping through search matches
   };
 
   root.hidden = false;
@@ -60,10 +63,19 @@ export async function openReader(record, { onClose, onProgress }) {
   root.innerHTML = `
     <div class="r-stage" id="rStage"><div class="r-loading">Opening “${esc(record.title)}”…</div></div>
     <div class="r-gutter" id="rGutter" hidden></div>
+    <div class="r-ribbon" id="rRibbon" hidden aria-hidden="true"></div>
+    <div class="findbar" id="rFindBar" hidden>
+      <button class="cbtn" id="fPrev" aria-label="Previous match">${ICON.chevL}</button>
+      <span id="fInfo" aria-live="polite"></span>
+      <button class="cbtn" id="fNext" aria-label="Next match">${ICON.chevR}</button>
+      <button class="fdone" id="fDone">Done</button>
+    </div>
     <div class="chrome top" id="cTop">
       <button class="cbtn" id="rClose" aria-label="Close book">${ICON.close}</button>
       <div class="ttl"><b>${esc(record.title)}</b>${record.author ? `<span>${esc(record.author)}</span>` : ''}</div>
-      <button class="cbtn" id="rToc" aria-label="Contents">${ICON.list}</button>
+      <button class="cbtn" id="rFind" aria-label="Find in book">${ICON.find}</button>
+      <button class="cbtn" id="rMark" aria-label="Bookmark this page" aria-pressed="false">${ICON.mark}</button>
+      <button class="cbtn" id="rToc" aria-label="Contents and bookmarks">${ICON.list}</button>
       <button class="cbtn" id="rAa" aria-label="Appearance">${ICON.aa}</button>
     </div>
     <div class="chrome bottom" id="cBot">
@@ -161,6 +173,7 @@ export async function openReader(record, { onClose, onProgress }) {
       R.offset = msg.offset; R.page = msg.page; R.pageCount = msg.pageCount; R.chapterFrac = msg.fraction;
       R.overall = overallFor(R.chapter, msg.fraction);
       updateLocation();
+      updateMarkState();
       persist();
     } else if (msg.type === 'tap') handleTap(msg.x);
     else if (msg.type === 'swipe') { msg.dir === 'left' ? next() : prev(); }
@@ -269,6 +282,7 @@ export async function openReader(record, { onClose, onProgress }) {
   }
   function pdfGo(p, dir) {
     R.pdfPage = Math.max(0, Math.min(p, R.pdf.numPages - 1));
+    queueMicrotask(updateMarkState);
     R.overall = R.pdf.numPages > 1 ? R.pdfPage / (R.pdf.numPages - 1) : 1;
     updateLocation();
     persist();
@@ -314,19 +328,182 @@ export async function openReader(record, { onClose, onProgress }) {
     const sh = $('rSheet');
     $('rBackdrop').hidden = false;
     sh.hidden = false;
-    if (kind === 'toc') renderToc(sh); else renderSettings(sh);
+    if (kind === 'toc') renderToc(sh, 'contents');
+    else if (kind === 'bookmarks') renderToc(sh, 'bookmarks');
+    else if (kind === 'search') renderSearch(sh);
+    else renderSettings(sh);
   }
   function closeSheet() { R.sheet = null; $('rSheet').hidden = true; $('rBackdrop').hidden = true; }
 
-  function renderToc(sh) {
+  function renderToc(sh, tab) {
     const toc = R.book?.toc || [];
     const cur = currentTocEntry();
-    sh.innerHTML = `<div class="grab"></div><div class="sh"><b>Contents</b><button id="shDone">Done</button></div>
-      ${toc.length ? `<div class="toc">${toc.map((t, i) => `<button class="toc-row${t === cur ? ' cur' : ''}" data-i="${i}" style="padding-left:${12 + t.level * 16}px">${esc(t.title)}</button>`).join('')}</div>`
-                   : '<p class="hint">This book has no table of contents.</p>'}`;
+    const tabs = `<div class="segm sheet-tabs" role="tablist">
+      <button role="tab" data-tab="contents" aria-pressed="${tab === 'contents'}">Contents</button>
+      <button role="tab" data-tab="bookmarks" aria-pressed="${tab === 'bookmarks'}">Bookmarks${R.bookmarks.length ? ` (${R.bookmarks.length})` : ''}</button></div>`;
+    let body;
+    if (tab === 'contents') {
+      body = toc.length ? `<div class="toc">${toc.map((t, i) => `<button class="toc-row${t === cur ? ' cur' : ''}" data-i="${i}" style="padding-left:${12 + t.level * 16}px">${esc(t.title)}</button>`).join('')}</div>`
+                        : '<p class="hint">This book has no table of contents.</p>';
+    } else {
+      const list = sortedBookmarks();
+      body = list.length ? `<div class="bm-list">${list.map(b => `<div class="bm-row">
+          <button class="bm-go" data-bm="${b.id}"><span class="bm-where">${esc(whereLabel(b))}</span>
+            ${b.label ? `<span class="bm-text">${esc(b.label)}</span>` : ''}
+            <span class="bm-when">${new Date(b.created).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}</span></button>
+          <button class="bm-del" data-del="${b.id}" aria-label="Delete bookmark">${ICON.close}</button></div>`).join('')}</div>`
+        : `<p class="hint">No bookmarks yet. Tap the bookmark button at the top of a page to add one.</p>`;
+    }
+    sh.innerHTML = `<div class="grab"></div><div class="sh"><b>${tab === 'contents' ? 'Contents' : 'Bookmarks'}</b><button id="shDone">Done</button></div>${tabs}${body}`;
     $('shDone').onclick = closeSheet;
+    sh.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { R.sheet = b.dataset.tab === 'contents' ? 'toc' : 'bookmarks'; renderToc(sh, b.dataset.tab); });
     sh.querySelectorAll('[data-i]').forEach(b => b.onclick = () => goToc(toc[+b.dataset.i]));
-    sh.querySelector('.toc-row.cur')?.scrollIntoView({ block: 'center' });
+    sh.querySelectorAll('[data-bm]').forEach(b => b.onclick = () => goBookmark(R.bookmarks.find(x => x.id === b.dataset.bm)));
+    sh.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { removeBookmarks([b.dataset.del]); renderToc(sh, 'bookmarks'); });
+    if (tab === 'contents') sh.querySelector('.toc-row.cur')?.scrollIntoView({ block: 'center' });
+  }
+
+  // ---------- bookmarks ----------
+  const engineApi = () => (R.ready && R.frame?.contentWindow?.BookNest) || null;
+  function chapterTitle(i) {
+    let t = null;
+    for (const e of R.book?.toc || []) if (e.index <= i) t = e.title;
+    return t || (R.book?.spine?.length > 1 ? `Section ${i + 1}` : record.title);
+  }
+  function whereLabel(b) {
+    if (isPDF) return `Page ${b.page + 1}`;
+    return `${chapterTitle(b.chapter)} · ${Math.round((b.fraction || 0) * 100)}%`;
+  }
+  function sortedBookmarks() {
+    return R.bookmarks.slice().sort((a, b) => isPDF ? a.page - b.page : (a.chapter - b.chapter) || (a.offset - b.offset));
+  }
+  function bookmarksOnScreen() {
+    if (isPDF) { const shown = R.pdf ? pdfGroup(R.pdfPage) : []; return R.bookmarks.filter(b => shown.includes(b.page)); }
+    const api = engineApi();
+    if (!api) return [];
+    return R.bookmarks.filter(b => b.chapter === R.chapter && api.isVisible(b.offset));
+  }
+  function updateMarkState() {
+    if (R.closed) return;
+    const on = bookmarksOnScreen().length > 0;
+    const btn = $('rMark');
+    btn.setAttribute('aria-pressed', String(on));
+    btn.setAttribute('aria-label', on ? 'Remove bookmark from this page' : 'Bookmark this page');
+    btn.innerHTML = on ? ICON.markOn : ICON.mark;
+    $('rRibbon').hidden = !on;
+  }
+  async function saveBookmarks() {
+    await db.put('bookmarks', { bookId: record.id, items: R.bookmarks }).catch(() => {});
+  }
+  function removeBookmarks(ids) {
+    R.bookmarks = R.bookmarks.filter(b => !ids.includes(b.id));
+    saveBookmarks();
+    updateMarkState();
+  }
+  function toggleBookmark() {
+    const here = bookmarksOnScreen();
+    if (here.length) { removeBookmarks(here.map(b => b.id)); toast('Bookmark removed', 1600); return; }
+    const api = engineApi();
+    const offset = isPDF ? 0 : (api ? api.offset() : R.offset);
+    R.bookmarks.push({
+      id: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2)),
+      chapter: isPDF ? 0 : R.chapter, offset, page: isPDF ? R.pdfPage : 0, fraction: R.overall,
+      label: isPDF ? '' : (api ? api.snippet(offset, 90) : ''), created: Date.now(),
+    });
+    saveBookmarks();
+    updateMarkState();
+    toast('Page bookmarked', 1600);
+  }
+  function goBookmark(b) {
+    if (!b) return;
+    closeSheet(); hideChrome();
+    if (isPDF) pdfGo(b.page);
+    else loadChapter(b.chapter, { kind: 'offset', value: b.offset });
+  }
+
+  // ---------- find ----------
+  async function sectionText(i) {
+    if (R.texts.has(i)) return R.texts.get(i);
+    let t = '';
+    if (isPDF) {
+      const page = await R.pdf.getPage(i + 1);
+      t = (await page.getTextContent()).items.map(x => x.str).join(' ');
+    } else {
+      t = await R.book.chapterText(i);
+    }
+    R.texts.set(i, t);
+    return t;
+  }
+  async function runSearch(q) {
+    const token = ++R.search.token;
+    R.search = { q, results: [], done: false, token };
+    renderResults();
+    if (q.length < 2) { R.search.done = true; renderResults(); return; }
+    const needle = q.toLowerCase(), count = isPDF ? R.pdf.numPages : R.book.spine.length;
+    for (let i = 0; i < count; i++) {
+      const text = await sectionText(i);
+      if (token !== R.search.token) return;   // a newer search started
+      const lower = text.toLowerCase();
+      let at = -1, nth = 0;
+      while ((at = lower.indexOf(needle, at + 1)) >= 0 && R.search.results.length < 500) {
+        const from = Math.max(0, at - 40), to = Math.min(text.length, at + needle.length + 70);
+        R.search.results.push({ section: i, nth: nth++,
+          before: (from > 0 ? '…' : '') + text.slice(from, at).replace(/\s+/g, ' ').trimStart(),
+          match: text.slice(at, at + needle.length),
+          after: text.slice(at + needle.length, to).replace(/\s+/g, ' ') + (to < text.length ? '…' : '') });
+      }
+      if (i % 5 === 4) renderResults();
+    }
+    R.search.done = true;
+    renderResults();
+  }
+  function renderSearch(sh) {
+    sh.innerHTML = `<div class="grab"></div><div class="sh"><b>Find in Book</b><button id="shDone">Done</button></div>
+      <label class="search findfield">${ICON.search}<input id="findInput" type="search" placeholder="Search this book" value="${esc(R.search.q)}" aria-label="Search this book" autocomplete="off"></label>
+      <div id="findResults"></div>`;
+    $('shDone').onclick = closeSheet;
+    const input = $('findInput');
+    let t;
+    input.oninput = () => { clearTimeout(t); t = setTimeout(() => runSearch(input.value.trim()), 280); };
+    input.onkeydown = e => { if (e.key === 'Enter') { clearTimeout(t); input.blur(); runSearch(input.value.trim()); } };
+    renderResults();
+    setTimeout(() => input.focus(), 50);
+  }
+  function renderResults() {
+    const box = $('findResults');
+    if (!box) return;
+    const { q, results, done } = R.search;
+    if (!q || q.length < 2) { box.innerHTML = '<p class="hint">Type at least two letters.</p>'; return; }
+    const head = done ? (results.length ? `${results.length}${results.length >= 500 ? '+' : ''} ${results.length === 1 ? 'match' : 'matches'}` : `No matches for “${esc(q)}”.`) : `Searching… ${results.length} so far`;
+    let last = -1;
+    box.innerHTML = `<p class="hint find-count">${head}</p><div class="find-list">` + results.map((r, i) => {
+      const heading = r.section !== last ? `<div class="find-sec">${esc(isPDF ? `Page ${r.section + 1}` : chapterTitle(r.section))}</div>` : '';
+      last = r.section;
+      return heading + `<button class="find-row" data-r="${i}">${esc(r.before)}<mark>${esc(r.match)}</mark>${esc(r.after)}</button>`;
+    }).join('') + '</div>';
+    box.querySelectorAll('[data-r]').forEach(b => b.onclick = () => goResult(+b.dataset.r));
+  }
+  function goResult(i) {
+    const r = R.search.results[i];
+    if (!r) return;
+    R.find = { q: R.search.q, index: i };
+    closeSheet(); hideChrome();
+    if (isPDF) pdfGo(r.section);
+    else loadChapter(r.section, { kind: 'find', value: R.find.q, nth: r.nth });
+    showFindBar();
+  }
+  function showFindBar() {
+    const n = R.search.results.length;
+    $('rFindBar').hidden = !R.find;
+    if (!R.find) return;
+    $('fInfo').textContent = `${R.find.index + 1} of ${n}${n >= 500 ? '+' : ''} · “${R.find.q}”`;
+    $('fPrev').disabled = R.find.index <= 0;
+    $('fNext').disabled = R.find.index >= n - 1;
+  }
+  function closeFind() {
+    R.find = null;
+    $('rFindBar').hidden = true;
+    engineApi()?.clearFind();
   }
 
   function renderSettings(sh) {
@@ -404,6 +581,11 @@ export async function openReader(record, { onClose, onProgress }) {
 
   $('rClose').onclick = close;
   $('rToc').onclick = () => openSheet('toc');
+  $('rMark').onclick = toggleBookmark;
+  $('rFind').onclick = () => openSheet('search');
+  $('fPrev').onclick = () => R.find && goResult(R.find.index - 1);
+  $('fNext').onclick = () => R.find && goResult(R.find.index + 1);
+  $('fDone').onclick = closeFind;
   $('rAa').onclick = () => openSheet('settings');
   $('rBackdrop').onclick = closeSheet;
   const slider = $('rSlider');
@@ -471,7 +653,8 @@ export async function openReader(record, { onClose, onProgress }) {
       $('rGutter').hidden = !spreadNow();
       await loadChapter(R.chapter, { kind: 'offset', value: R.offset });
     }
-    $('rToc').disabled = !(R.book.toc && R.book.toc.length);
+    R.bookmarks = ((await db.get('bookmarks', record.id)) || {}).items || [];
+    updateMarkState();
     ro.observe(stage);
     updateLocation();
     scheduleHide();

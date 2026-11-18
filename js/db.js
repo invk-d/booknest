@@ -4,9 +4,10 @@
 //   files    bookId -> Blob (the book file itself)
 //   covers   bookId -> Blob (JPEG thumbnail)
 //   progress { bookId, chapter, offset, page, fraction, last }
+//   bookmarks { bookId, items: [{ id, chapter, offset, page, fraction, label, created }] }
 
 const DB_NAME = 'booknest';
-const VERSION = 1;
+const VERSION = 2;
 let dbPromise;
 
 function open() {
@@ -14,12 +15,14 @@ function open() {
     dbPromise = new Promise((resolve, reject) => {
       const req = indexedDB.open(DB_NAME, VERSION);
       req.onupgradeneeded = () => {
-        const d = req.result;
-        d.createObjectStore('folders', { keyPath: 'id' });
-        d.createObjectStore('books', { keyPath: 'id' });
-        d.createObjectStore('files');
-        d.createObjectStore('covers');
-        d.createObjectStore('progress', { keyPath: 'bookId' });
+        // Runs for new installs and for upgrades; only adds what's missing, so existing data is kept.
+        const d = req.result, has = n => d.objectStoreNames.contains(n);
+        if (!has('folders')) d.createObjectStore('folders', { keyPath: 'id' });
+        if (!has('books')) d.createObjectStore('books', { keyPath: 'id' });
+        if (!has('files')) d.createObjectStore('files');
+        if (!has('covers')) d.createObjectStore('covers');
+        if (!has('progress')) d.createObjectStore('progress', { keyPath: 'bookId' });
+        if (!has('bookmarks')) d.createObjectStore('bookmarks', { keyPath: 'bookId' });
       };
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => reject(req.error);
@@ -55,8 +58,8 @@ export const db = {
     if (cover) t.objectStore('covers').put(cover, book.id);
   }),
 
-  deleteBook: id => run(['books', 'files', 'covers', 'progress'], 'readwrite', t => {
-    for (const s of ['books', 'files', 'covers', 'progress']) t.objectStore(s).delete(id);
+  deleteBook: id => run(['books', 'files', 'covers', 'progress', 'bookmarks'], 'readwrite', t => {
+    for (const s of ['books', 'files', 'covers', 'progress', 'bookmarks']) t.objectStore(s).delete(id);
   }),
 };
 

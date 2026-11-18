@@ -36,6 +36,7 @@ function engine(flip) {
     c.push('img,figure,table,pre{-webkit-column-break-inside:avoid;break-inside:avoid;}');
     c.push('pre{white-space:pre-wrap' + imp + ';}');
     c.push('::selection{background:' + cfg.link + '55;}');
+    c.push('::highlight(bnfind){background-color:#ffd60a;color:#000;}');
     if (paged()) {
       c.push('img,svg,video{max-height:' + Math.max(50, k.vh - 2 * k.mv - 8) + 'px' + imp + ';object-fit:contain;}');
       c.push('html{height:100%' + imp + ';overflow:hidden' + imp + ';touch-action:none;}');
@@ -166,6 +167,7 @@ function engine(flip) {
     t = t || { kind: 'start' };
     var de = document.documentElement;
     if (t.kind === 'offset') { goToOffset(t.value); return; }
+    if (t.kind === 'find') { if (find(t.value, t.nth || 0)) return; }
     if (t.kind === 'end') {
       if (paged()) setPage(pageCount - 1); else de.scrollTop = scrollMax();
     } else if (t.kind === 'fraction') {
@@ -314,6 +316,62 @@ function engine(flip) {
     var de = document.documentElement;
     if (de.scrollTop <= 2) return false;
     de.scrollTop -= window.innerHeight - 60; return true;
+  };
+  // ---- bookmarks & find ----
+  // Is the character at this offset on screen right now?
+  S.isVisible = function (o) {
+    var r = rangeAtOffset(o);
+    return visibleNow(r ? rectOf(r) : null, metrics());
+  };
+  S.offset = function () { return offset; };
+  // Up to n characters of text starting at an offset (for bookmark labels).
+  S.snippet = function (o, n) {
+    var w = textWalker(), node, total = 0, out = '';
+    while ((node = w.nextNode()) && out.length < n * 2) {
+      var v = node.nodeValue, end = total + v.length;
+      var tag = node.parentNode && node.parentNode.nodeName;
+      if (end > o && tag !== 'SCRIPT' && tag !== 'STYLE') {
+        // separate headings/paragraphs with a space; words split across inline tags stay joined
+        var inline = node.parentNode && getComputedStyle(node.parentNode).display === 'inline';
+        out += (out && !inline ? ' ' : '') + v.slice(Math.max(0, o - total));
+      }
+      total = end;
+    }
+    out = out.replace(/\s+/g, ' ').trim();
+    return out.length > n ? out.slice(0, n).replace(/\s+\S*$/, '') + '…' : out;
+  };
+  // Finds the nth match (case-insensitive) of q, shows its page and highlights it.
+  function find(q, nth) {
+    if (!q) return false;
+    var w = textWalker(), node, total = 0, text = '', map = [];
+    while ((node = w.nextNode())) {
+      var tag = node.parentNode && node.parentNode.nodeName;
+      if (tag !== 'SCRIPT' && tag !== 'STYLE') { map.push([text.length, total]); text += node.nodeValue; }
+      total += node.nodeValue.length;
+    }
+    var lower = text.toLowerCase(), needle = q.toLowerCase(), i = -1;
+    for (var k = 0; k <= nth; k++) { i = lower.indexOf(needle, i + 1); if (i < 0) return false; }
+    function full(at) {   // position in the searchable text -> offset in the chapter
+      var seg = map[0];
+      for (var j = 0; j < map.length && map[j][0] <= at; j++) seg = map[j];
+      return seg[1] + (at - seg[0]);
+    }
+    var startO = full(i), endO = full(i + needle.length - 1) + 1;
+    var a = rangeAtOffset(startO), b = rangeAtOffset(endO - 1);
+    if (a && b) {
+      var r = document.createRange(); r.setStart(a.startContainer, a.startOffset); r.setEnd(b.endContainer, b.endOffset);
+      try {
+        if (window.CSS && CSS.highlights && window.Highlight) CSS.highlights.set('bnfind', new Highlight(r));
+        else { var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r); }
+      } catch (e) { /* highlighting is optional */ }
+    }
+    goToOffset(startO);
+    return true;
+  }
+  S.find = function (q, nth) { return find(q, nth); };
+  S.clearFind = function () {
+    try { if (window.CSS && CSS.highlights) CSS.highlights.delete('bnfind'); window.getSelection().removeAllRanges(); } catch (e) {}
+    return true;
   };
 }
 
