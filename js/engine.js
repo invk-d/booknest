@@ -29,7 +29,6 @@ function engine(flip) {
     if (cfg.font) c.push('body,body *:not(pre):not(code):not(kbd):not(samp){font-family:' + cfg.font + imp + ';}');
     c.push('body *{color:inherit' + imp + ';background-color:transparent' + imp + ';}');
     c.push('a,a *{color:' + cfg.link + imp + ';}');
-    c.push('a[href]{text-decoration:underline' + imp + ';text-decoration-thickness:1px;text-underline-offset:2px;}');
     c.push('p,li,blockquote,dd,dt,div{line-height:' + cfg.lineHeight + imp + ';}');
     if (cfg.paraSpacing != null) c.push('p{margin-top:0' + imp + ';margin-bottom:' + cfg.paraSpacing + 'em' + imp + ';}');
     c.push('p{text-align:' + (cfg.justify ? 'justify' : 'start') + imp + ';-webkit-hyphens:' + hy + imp + ';hyphens:' + hy + imp + ';}');

@@ -8,11 +8,11 @@ import { bookFlip } from './flip.js';
 import { esc, ICON, setThemeColor } from './ui.js';
 
 export const THEMES = {
-  light: { bg: '#ffffff', fg: '#1c1c1e', link: '#3a3a3c', label: 'Light' },
-  sepia: { bg: '#f4ecd8', fg: '#5b4636', link: '#45403a', label: 'Sepia' },
-  gray:  { bg: '#4a4a4e', fg: '#ededf0', link: '#d1d1d6', label: 'Gray' },
-  dark:  { bg: '#1c1c1e', fg: '#e3e3e6', link: '#c7c7cc', label: 'Dark' },
-  black: { bg: '#000000', fg: '#c9c9cc', link: '#aeaeb2', label: 'Black' },
+  light: { bg: '#ffffff', fg: '#1c1c1e', link: '#3a3a3c', textLink: '#0a60d0', label: 'Light' },
+  sepia: { bg: '#f4ecd8', fg: '#5b4636', link: '#45403a', textLink: '#8a5a2b', label: 'Sepia' },
+  gray:  { bg: '#4a4a4e', fg: '#ededf0', link: '#d1d1d6', textLink: '#6cb4ff', label: 'Gray' },
+  dark:  { bg: '#1c1c1e', fg: '#e3e3e6', link: '#c7c7cc', textLink: '#6cb4ff', label: 'Dark' },
+  black: { bg: '#000000', fg: '#c9c9cc', link: '#aeaeb2', textLink: '#6cb4ff', label: 'Black' },
 };
 export const FONTS = [
   ['original', 'Original', null],
@@ -149,7 +149,7 @@ export async function openReader(record, { onClose, onProgress }) {
   function engineConfig() {
     const t = theme(settings);
     const font = FONTS.find(f => f[0] === settings.font) || FONTS[1];
-    return { bg: t.bg, fg: t.fg, link: t.link, font: font[2], fontSize: settings.size, lineHeight: settings.line,
+    return { bg: t.bg, fg: t.fg, link: t.textLink, font: font[2], fontSize: settings.size, lineHeight: settings.line,
              margin: settings.margin, marginV: 28, justify: settings.justify, hyphenate: settings.hyphenate,
              mode: settings.mode, spread: spreadNow(), gutter: settings.gutter, animate: settings.animate !== false, paraSpacing: settings.paraSpacing,
              dark: [THEMES.gray, THEMES.dark, THEMES.black].includes(t) };
