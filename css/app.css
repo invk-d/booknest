@@ -192,7 +192,7 @@ body.dropping::after { content: "Drop books to add them"; position: fixed; inset
 .chrome.bottom .loc span:first-child { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 
 /* bookmark ribbon on a bookmarked page, and the find bar */
-.r-ribbon { position: absolute; z-index: 2; top: calc(var(--st) + 2px); right: calc(var(--sr) + 22px); width: 16px; height: 26px; background: #ff3b30; box-shadow: 0 1px 3px rgba(0,0,0,.3); clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 76%, 0 100%); -webkit-clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 76%, 0 100%); pointer-events: none; }
+.r-ribbon { position: absolute; z-index: 2; top: calc(var(--st) + 2px); right: calc(var(--sr) + 22px); width: 16px; height: 26px; background: #7b1e2e; box-shadow: 0 1px 3px rgba(0,0,0,.3); clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 76%, 0 100%); -webkit-clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 76%, 0 100%); pointer-events: none; }
 .findbar { position: absolute; z-index: 3; left: 50%; transform: translateX(-50%); bottom: calc(var(--sb) + 72px); display: flex; align-items: center; gap: 4px; padding: 4px 6px 4px 4px; border-radius: 16px; background: color-mix(in srgb, var(--rbg) 86%, transparent); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); box-shadow: 0 4px 18px rgba(0,0,0,.22), 0 0 0 1px color-mix(in srgb, var(--rfg) 12%, transparent); color: var(--rfg); max-width: calc(100% - 24px); }
 .findbar #fInfo { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; padding: 0 4px; font-variant-numeric: tabular-nums; }
 .findbar .fdone { color: var(--rlink); font-weight: 600; font-size: 15px; padding: 6px 8px; }

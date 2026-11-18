@@ -125,7 +125,7 @@ function contentsHTML() {
   const books = sortBooks((inToRead ? S.books.filter(b => b.toRead) : childBooks(S.folderId))
     .filter(b => !q || hit(b.title) || hit(b.author) || hit(b.fileName)));
   let h = '';
-  if (!S.wide && S.folderId === null && !q) {
+  if (S.folderId === null && !q) {
     const recent = recentBooks();
     if (recent.length) h += `<div class="sec-h">Continue Reading</div><div class="recent">${recent.slice(0, 12).map(bookCard).join('')}</div>`;
   }
@@ -208,10 +208,8 @@ function render() {
   S.wide = window.innerWidth >= 600;
   const main = `<main class="detail">${headerHTML()}<div class="scroll" id="scroll">${contentsHTML()}</div></main>`;
   if (S.wide) {
-    const recent = recentBooks().slice(0, 4);
     app.innerHTML = `<nav class="sidebar" aria-label="Folders"><div class="navbar"><div class="navrow"><span></span></div><div class="bigtitle">BookNest</div></div>
       <div class="scroll">
-        ${recent.length ? `<div class="sec-h">Continue Reading</div>${recent.map(b => `<button class="side-recent" data-book="${b.id}">${coverHTML(b)}<span class="meta"><span>${esc(b.title)}</span><span class="bar"><i style="width:${Math.round((S.progress[b.id].fraction || 0) * 100)}%"></i></span></span></button>`).join('')}` : ''}
         <div class="sec-h">Lists</div>
         <div class="tree"><button class="tnode${S.folderId === TOREAD ? ' sel' : ''}" data-tree="${TOREAD}">
           <span class="disc" style="visibility:hidden"></span>${ICON.bookmark}<span class="lbl">To Read</span><span class="tcount">${S.books.filter(b => b.toRead).length}</span></button></div>
