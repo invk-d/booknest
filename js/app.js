@@ -62,7 +62,7 @@ const COLLECTIONS = [
     empty: 'You’ve started every book in your library.' },
   { id: ':finished', name: 'Finished', icon: 'finished', books: () => S.books.filter(isFinished),
     empty: 'Books you finish appear here. You can also press and hold a book and choose <b>Mark as Finished</b>.' },
-  { id: TOREAD, name: 'To Read', icon: 'bookmark', books: () => S.books.filter(b => b.toRead),
+  { id: TOREAD, name: 'To Read', icon: 'star', books: () => S.books.filter(b => b.toRead),
     empty: 'Nothing on your To Read list yet.<br>Press and hold any book and choose <b>Add to To Read</b>.' },
 ];
 const collectionById = id => COLLECTIONS.find(c => c.id === id) || null;
@@ -634,8 +634,8 @@ function applyLook() {
 
 const HOWTO = [
   ['plus', 'Adding books', `<p>Tap <b>+ → Add Books…</b> and choose EPUB, PDF, TXT or Markdown files from the Files app. You can select several at once. New books go into the folder you're viewing.</p><p>Adding a book that's already in your library is recognised and skipped.</p>`],
-  ['folder', 'Importing a whole folder', `<p>Tap <b>+ → Import Folder…</b>. On iPhone, first open the Files app, press and hold the folder and tap <b>Compress</b>, then choose the .zip it makes. BookNest rebuilds the folder with all its subfolders.</p><p>Import the same folder again later to add only the books that are new.</p>`],
-  ['folder', 'Organising folders and books', `<p>Tap <b>+ → New Folder…</b> to make a folder inside the one you're viewing.</p><p><b>Press and hold</b> any book or folder to move, rename or delete it. Deleting only removes it from BookNest; your files in Files aren't touched.</p>`],
+  ['folderLine', 'Importing a whole folder', `<p>Tap <b>+ → Import Folder…</b>. On iPhone, first open the Files app, press and hold the folder and tap <b>Compress</b>, then choose the .zip it makes. BookNest rebuilds the folder with all its subfolders.</p><p>Import the same folder again later to add only the books that are new.</p>`],
+  ['folderLine', 'Organising folders and books', `<p>Tap <b>+ → New Folder…</b> to make a folder inside the one you're viewing.</p><p><b>Press and hold</b> any book or folder to move, rename or delete it. Deleting only removes it from BookNest; your files in Files aren't touched.</p>`],
   ['allBooks', 'Collections', `<p>Collections gather books from every folder: <b>All Books</b>, <b>Favourites</b>, <b>Currently Reading</b>, <b>Recently Added</b>, <b>Unread</b>, <b>Finished</b> and <b>To Read</b>.</p><p>Press and hold a book to <b>Mark as Finished</b> (or not finished).</p>`],
   ['heart', 'Favourites and To Read', `<p>Press and hold a book and choose <b>Add to Favourites</b> or <b>Add to To Read</b>. Books on your To Read list get an orange ribbon on the cover. Choose the same option again to remove it.</p>`],
   ['search', 'Searching your library', `<p>The search box on the main Library page searches every book and folder. Inside a folder or collection, it searches just that one.</p>`],
@@ -643,8 +643,7 @@ const HOWTO = [
   ['mark', 'Bookmarks', `<p>While reading, tap the <b>bookmark</b> button at the top to bookmark the page; a ribbon shows on bookmarked pages. Tap it again to remove it.</p><p>See all bookmarks under <b>Contents → Bookmarks</b>.</p>`],
   ['find', 'Finding text in a book', `<p>While reading, tap the <b>magnifier</b> and type. Tap a match to jump to it highlighted, then use <b>‹ ›</b> to step through matches.</p>`],
   ['gear', 'Backing up and restoring', `<p>In Settings, tap <b>Back Up Library…</b> and choose <b>Save to Files</b>. The backup holds your folders, book list, reading progress, bookmarks, marks and settings. Book files aren't included.</p><p>To recover, tap <b>Restore from Backup…</b>. Books then show <b>File needed</b>: add them again from Files (all at once is fine) and each goes back into its folder with your place kept.</p>`],
-  ['book', 'Home Screen and offline', `<p>In Safari, tap <b>Share → Add to Home Screen</b> to use BookNest like an app. Your books are stored on this device and work offline. Add books from the Home Screen app, not a Safari tab; iPhone keeps their storage separate.</p>`],
-  ['reading', 'iPhone Duo: open and closed', `<p>Closed, you get one column and single pages. Open, you get a sidebar with collections and folders, and books show as two-page spreads that turn on the middle line. Your place is kept as you fold and unfold.</p>`],
+  ['phone', 'Home Screen and offline', `<p>In Safari, tap <b>Share → Add to Home Screen</b> to use BookNest like an app. Your books are stored on this device and work offline. Add books from the Home Screen app, not a Safari tab; iPhone keeps their storage separate.</p>`],
 ];
 
 function openSettings() {
@@ -674,7 +673,7 @@ function openSettings() {
         </div>
 
         <div class="sec-h">How to Use</div>
-        <div class="group howto">${HOWTO.map(([icon, title, body]) => `<details><summary>${ICON[icon].replace('<svg', '<svg class="folder-ic"').replace('class="folder-ic" class="folder-ic"', 'class="folder-ic"')}<span>${title}</span></summary><div class="hbody">${body}</div></details>`).join('')}</div>
+        <div class="group howto">${HOWTO.map(([icon, title, body]) => `<details><summary>${ICON[icon].includes('class="folder-ic"') ? ICON[icon] : ICON[icon].replace('<svg', '<svg class="folder-ic"')}<span>${title}</span></summary><div class="hbody">${body}</div></details>`).join('')}</div>
         <p class="set-foot">BookNest</p>
       </div></div>`;
     wrap.querySelector('#setDone').onclick = close;
