@@ -203,7 +203,7 @@ function welcomeHTML() {
   const ios = isIOS();
   const installed = navigator.standalone || matchMedia('(display-mode: standalone)').matches;
   return `<div class="welcome">
-    <div class="logo">${ICON.book}</div>
+    <img class="logo" src="icons/icon-512.png" alt="BookNest" width="88" height="88">
     <h2>Welcome to BookNest</h2>
     <p>Add EPUB, PDF or text files from the Files app, then organise them into folders.</p>
     <div class="empty-btns"><button class="btn" data-act="add">Add Books</button><button class="btn ghost" data-act="importfolder">Import Folder</button><button class="btn ghost" data-act="newfolder">New Folder</button></div>
