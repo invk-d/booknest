@@ -8,11 +8,11 @@ import { bookFlip } from './flip.js';
 import { esc, ICON, setThemeColor } from './ui.js';
 
 export const THEMES = {
-  light: { bg: '#ffffff', fg: '#1c1c1e', link: '#0a60d0', label: 'Light' },
-  sepia: { bg: '#f4ecd8', fg: '#5b4636', link: '#8a5a2b', label: 'Sepia' },
-  gray:  { bg: '#4a4a4e', fg: '#ededf0', link: '#6cb4ff', label: 'Gray' },
-  dark:  { bg: '#1c1c1e', fg: '#e3e3e6', link: '#6cb4ff', label: 'Dark' },
-  black: { bg: '#000000', fg: '#c9c9cc', link: '#6cb4ff', label: 'Black' },
+  light: { bg: '#ffffff', fg: '#1c1c1e', link: '#3a3a3c', label: 'Light' },
+  sepia: { bg: '#f4ecd8', fg: '#5b4636', link: '#45403a', label: 'Sepia' },
+  gray:  { bg: '#4a4a4e', fg: '#ededf0', link: '#d1d1d6', label: 'Gray' },
+  dark:  { bg: '#1c1c1e', fg: '#e3e3e6', link: '#c7c7cc', label: 'Dark' },
+  black: { bg: '#000000', fg: '#c9c9cc', link: '#aeaeb2', label: 'Black' },
 };
 export const FONTS = [
   ['original', 'Original', null],
