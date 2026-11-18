@@ -52,6 +52,8 @@ const isStarted = b => (S.progress[b.id]?.fraction || 0) > 0;
 const COLLECTIONS = [
   { id: ':all', name: 'All Books', icon: 'allBooks', books: () => S.books,
     empty: 'No books yet.' },
+  { id: ':favourites', name: 'Favourites', icon: 'heart', books: () => S.books.filter(b => b.favourite),
+    empty: 'No favourites yet.<br>Press and hold any book and choose <b>Add to Favourites</b>.' },
   { id: ':reading', name: 'Currently Reading', icon: 'reading', order: 'recent', books: () => S.books.filter(b => isStarted(b) && !isFinished(b)),
     empty: 'Books you’ve started and not finished appear here.' },
   { id: ':recent', name: 'Recently Added', icon: 'added', order: 'added',
@@ -164,7 +166,7 @@ function contentsHTML() {
   let h = '';
   if (S.folderId === null && !q) {
     const recent = recentBooks();
-    if (recent.length) h += `<div class="sec-h">Continue Reading</div><div class="recent">${recent.slice(0, 12).map(bookCard).join('')}</div>`;
+    if (recent.length) h += `<div class="sec-h">Continue Reading</div><div class="recent">${recent.slice(0, 12).map(b => bookCard(b, true)).join('')}</div>`;
   }
   const missingCount = S.books.filter(b => !S.fileIds.has(b.id)).length;
   if (S.folderId === null && missingCount && !q) {
@@ -440,6 +442,13 @@ async function deleteBook(b) {
   render();
 }
 
+async function toggleFavourite(b) {
+  b.favourite = b.favourite ? null : Date.now();
+  await db.put('books', b);
+  toast(b.favourite ? `Added “${b.title}” to Favourites` : `Removed “${b.title}” from Favourites`);
+  render();
+}
+
 async function toggleToRead(b) {
   b.toRead = b.toRead ? null : Date.now();
   await db.put('books', b);
@@ -514,6 +523,7 @@ onLongPress(app, '[data-book], [data-folder], [data-tree]', el => {
     const b = S.books.find(x => x.id === el.dataset.book);
     if (!b) return;
     const items = [
+      { label: b.favourite ? 'Remove from Favourites' : 'Add to Favourites', action: () => toggleFavourite(b) },
       { label: b.toRead ? 'Remove from To Read' : 'Add to To Read', action: () => toggleToRead(b) },
       { label: 'Move to…', action: () => moveBook(b) },
       { label: 'Rename…', action: () => renameBook(b) },

@@ -101,14 +101,15 @@ export async function restoreBackup(data) {
       idMap.set(b.id, existing.id);
       await db.put('books', { ...existing, title: b.title || existing.title, author: b.author ?? existing.author,
                               authorSort: b.authorSort ?? existing.authorSort, folderId: b.folderId ?? null,
-                              fp: existing.fp || b.fp, toRead: b.toRead ?? existing.toRead ?? null });
+                              fp: existing.fp || b.fp, toRead: b.toRead ?? existing.toRead ?? null,
+                              favourite: b.favourite ?? existing.favourite ?? null });
     } else {
       idMap.set(b.id, b.id);
       booksAdded++;
       await db.put('books', {
         id: b.id, folderId: b.folderId ?? null, title: String(b.title || b.fileName || 'Untitled'),
         author: b.author ?? null, authorSort: b.authorSort ?? null, format: b.format, fileName: b.fileName,
-        size: b.size, fileModified: b.fileModified, added: b.added || Date.now(), fp: b.fp || null, toRead: b.toRead ?? null,
+        size: b.size, fileModified: b.fileModified, added: b.added || Date.now(), fp: b.fp || null, toRead: b.toRead ?? null, favourite: b.favourite ?? null,
       });
     }
   }
