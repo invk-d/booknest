@@ -9,6 +9,8 @@ An eReader with folders. It runs in Safari and can be added to your iPhone Home 
 - **Add books from the Files app:** EPUB, PDF, TXT and Markdown. On a computer you can also drag files onto the window.
 - **Light or dark library:** tap the sun/moon button at the top of the library to choose Light, Dark or Automatic (matches your iPhone).
 - **Sort** by Title (ignoring "The", "A" and "An"), Author (last name first), File Name, Date Added or Recently Read. Grid or list view, and search by title, author or file name.
+- **Collections:** All Books, Currently Reading, Recently Added, Unread, Finished and To Read gather books from every folder. Press and hold a book to **Mark as Finished**. When the phone is open, the sidebar starts with a **Pick up where you left off** card for the book you read last.
+- **Search:** from the top of the library, it searches every book and folder. Inside a folder or collection, it searches just that.
 - **To Read list.** Press and hold any book and choose **Add to To Read**. The list collects marked books from every folder in one place, and marked books get a bookmark ribbon on the cover.
 - **Remembers where you stopped in every book**, with a "Continue Reading" shelf and a % read bar on each book.
 - **Reader:**

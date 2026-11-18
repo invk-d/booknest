@@ -40,10 +40,32 @@ async function loadAll() {
   S.folders = folders; S.books = books;
   S.fileIds = new Set(fileIds);
   S.progress = Object.fromEntries(progress.map(p => [p.bookId, p]));
-  if (S.folderId && S.folderId !== TOREAD && !folderById(S.folderId)) S.folderId = null;
+  if (S.folderId && !isCollection(S.folderId) && !folderById(S.folderId)) S.folderId = null;
 }
 const TOREAD = ':toread';            // the To Read list, shown like a folder
-const here = () => (S.folderId === TOREAD ? null : S.folderId);   // where new books/folders go
+const isCollection = id => typeof id === 'string' && id.startsWith(':');
+const here = () => (isCollection(S.folderId) ? null : S.folderId);   // where new books/folders go
+
+// Smart collections: shown like folders, worked out from reading progress and marks.
+const isFinished = b => { const p = S.progress[b.id]; return !!p && (p.finished === true || (p.finished !== false && p.fraction >= 0.99)); };
+const isStarted = b => (S.progress[b.id]?.fraction || 0) > 0;
+const COLLECTIONS = [
+  { id: ':all', name: 'All Books', icon: 'allBooks', books: () => S.books,
+    empty: 'No books yet.' },
+  { id: ':reading', name: 'Currently Reading', icon: 'reading', order: 'recent', books: () => S.books.filter(b => isStarted(b) && !isFinished(b)),
+    empty: 'Books you’ve started and not finished appear here.' },
+  { id: ':recent', name: 'Recently Added', icon: 'added', order: 'added',
+    books: () => S.books.slice().sort((a, b) => (b.added || 0) - (a.added || 0)).slice(0, 25), empty: 'No books yet.' },
+  { id: ':unread', name: 'Unread', icon: 'unread', books: () => S.books.filter(b => !isStarted(b) && !isFinished(b)),
+    empty: 'You’ve started every book in your library.' },
+  { id: ':finished', name: 'Finished', icon: 'finished', books: () => S.books.filter(isFinished),
+    empty: 'Books you finish appear here. You can also press and hold a book and choose <b>Mark as Finished</b>.' },
+  { id: TOREAD, name: 'To Read', icon: 'bookmark', books: () => S.books.filter(b => b.toRead),
+    empty: 'Nothing on your To Read list yet.<br>Press and hold any book and choose <b>Add to To Read</b>.' },
+];
+const collectionById = id => COLLECTIONS.find(c => c.id === id) || null;
+/** "Fiction › Classics" — where a book or folder lives. */
+const folderPath = id => chain(id).map(f => f.name).join(' › ') || 'Library';
 const folderById = id => S.folders.find(f => f.id === id) || null;
 const childFolders = id => S.folders.filter(f => (f.parentId ?? null) === id).sort((a, b) => coll.compare(a.name, b.name));
 const childBooks = id => S.books.filter(b => (b.folderId ?? null) === id);
@@ -107,23 +129,38 @@ function relTime(t) {
   if (d < 86400) return Math.round(d / 3600) + ' hr ago';
   return Math.round(d / 86400) + (Math.round(d / 86400) === 1 ? ' day ago' : ' days ago');
 }
-const bookCard = b => `<button class="book" data-book="${b.id}">${coverHTML(b)}<span class="bt">${esc(b.title)}</span>${b.author ? `<span class="ba">${esc(b.author)}</span>` : ''}${progressHTML(b)}</button>`;
-function bookRow(b) {
+const bookCard = (b, where) => `<button class="book" data-book="${b.id}">${coverHTML(b)}<span class="bt">${esc(b.title)}</span>${b.author ? `<span class="ba">${esc(b.author)}</span>` : ''}${where ? `<span class="bw">${ICON.folder}${esc(folderPath(b.folderId ?? null))}</span>` : ''}${progressHTML(b)}</button>`;
+function bookRow(b, where) {
   const p = S.progress[b.id];
   return `<button class="listrow" data-book="${b.id}">${coverHTML(b)}<span class="meta"><span class="bt">${esc(b.title)}</span>
     ${b.author ? `<span class="ba">${esc(b.author)}</span>` : ''}
-    <span class="sub">${FORMAT_LABEL[b.format]}${p ? ` · ${Math.round(p.fraction * 100)}% · ${relTime(p.last)}` : ''}</span>
+    <span class="sub">${where ? esc(folderPath(b.folderId ?? null)) + ' · ' : ''}${FORMAT_LABEL[b.format]}${p ? ` · ${Math.round(p.fraction * 100)}% · ${relTime(p.last)}` : ''}</span>
     ${p && p.fraction > 0 ? `<span class="bar" style="max-width:150px"><i style="width:${Math.round(p.fraction * 100)}%"></i></span>` : ''}</span></button>`;
 }
-const recentBooks = () => S.books.filter(b => S.progress[b.id]?.last).sort((a, b) => S.progress[b.id].last - S.progress[a.id].last);
+// Books being read, most recent first (finished books drop off; they're in the Finished collection).
+const recentBooks = () => S.books.filter(b => S.progress[b.id]?.last && !isFinished(b)).sort((a, b) => S.progress[b.id].last - S.progress[a.id].last);
 
 function contentsHTML() {
   const q = S.search.trim().toLowerCase();
   const hit = s => (s || '').toLowerCase().includes(q);
-  const inToRead = S.folderId === TOREAD;
-  const folders = inToRead ? [] : childFolders(S.folderId).filter(f => !q || hit(f.name));
-  const books = sortBooks((inToRead ? S.books.filter(b => b.toRead) : childBooks(S.folderId))
-    .filter(b => !q || hit(b.title) || hit(b.author) || hit(b.fileName)));
+  const match = b => !q || hit(b.title) || hit(b.author) || hit(b.fileName);
+  const col = collectionById(S.folderId);
+  const everywhere = S.folderId === null && !!q;   // search from the top covers the whole library
+  let folders, books, label = SORTS.find(s => s[0] === S.sort)[1];
+  if (col) {
+    folders = [];
+    books = col.books().filter(match);
+    if (col.order === 'recent') { books.sort((a, b) => (S.progress[b.id]?.last || 0) - (S.progress[a.id]?.last || 0)); label = 'Recently Read'; }
+    else if (col.order === 'added') { label = 'Date Added'; }
+    else books = sortBooks(books);
+  } else if (everywhere) {
+    folders = S.folders.filter(f => hit(f.name)).sort((a, b) => coll.compare(a.name, b.name));
+    books = sortBooks(S.books.filter(match));
+  } else {
+    folders = childFolders(S.folderId).filter(f => !q || hit(f.name));
+    books = sortBooks(childBooks(S.folderId).filter(match));
+  }
+  const showWhere = !!col || everywhere;
   let h = '';
   if (S.folderId === null && !q) {
     const recent = recentBooks();
@@ -135,25 +172,26 @@ function contentsHTML() {
       <span>Add them again from the Files app (you can select them all at once). BookNest puts each one back in its folder with your place kept.</span>
       <button class="btn" data-act="add">Add Book Files</button></div>`;
   }
-  if (S.folderId === null && !q && S.books.length) {
-    const n = S.books.filter(b => b.toRead).length;
-    h += `<div class="sec-h">Lists</div><div class="group"><button class="row" data-folder="${TOREAD}">${ICON.bookmark}<span class="label">To Read</span><span class="count">${n}</span>${ICON.chev}</button></div>`;
+  // On the closed phone the collections sit on the main page (the open layout has them in the sidebar).
+  if (S.folderId === null && !q && S.books.length && !S.wide) {
+    h += `<div class="sec-h">Collections</div><div class="group">` + COLLECTIONS.map(c =>
+      `<button class="row" data-folder="${c.id}">${ICON[c.icon]}<span class="label">${c.name}</span><span class="count">${c.books().length}</span>${ICON.chev}</button>`).join('') + `</div>`;
   }
   if (folders.length) {
     h += `<div class="sec-h">Folders</div><div class="group">` + folders.map(f => {
       const n = childFolders(f.id).length + childBooks(f.id).length;
-      return `<button class="row" data-folder="${f.id}">${ICON.folder}<span class="label">${esc(f.name)}</span><span class="count">${n}</span>${ICON.chev}</button>`;
+      const right = everywhere ? `<span class="count">${esc(folderPath(f.parentId ?? null))}</span>` : `<span class="count">${n}</span>`;
+      return `<button class="row" data-folder="${f.id}">${ICON.folder}<span class="label">${esc(f.name)}</span>${right}${ICON.chev}</button>`;
     }).join('') + `</div>`;
   }
   if (books.length) {
-    const label = SORTS.find(s => s[0] === S.sort)[1];
-    h += `<div class="sec-h">${books.length} ${books.length === 1 ? 'Book' : 'Books'} · by ${label}</div>`;
-    h += S.grid ? `<div class="grid">${books.map(bookCard).join('')}</div>` : `<div class="group">${books.map(bookRow).join('')}</div>`;
+    h += `<div class="sec-h">${everywhere ? 'In your whole library · ' : ''}${books.length} ${books.length === 1 ? 'Book' : 'Books'} · by ${label}</div>`;
+    h += S.grid ? `<div class="grid">${books.map(b => bookCard(b, showWhere)).join('')}</div>` : `<div class="group">${books.map(b => bookRow(b, showWhere)).join('')}</div>`;
   }
   if (!folders.length && !books.length) {
-    if (q) h = `<div class="empty">No results for “${esc(S.search)}”.</div>`;
+    if (q) h = `<div class="empty">No results for “${esc(S.search)}”${everywhere ? ' in your library' : ''}.</div>`;
     else if (S.folderId === null) h = welcomeHTML();
-    else if (inToRead) h = `<div class="empty">Nothing on your To Read list yet.<br>Press and hold any book and choose <b>Add to To Read</b>.</div>`;
+    else if (col) h = `<div class="empty">${col.empty}</div>`;
     else h = `<div class="empty">This folder is empty.<div class="empty-btns"><button class="btn" data-act="add">Add Books</button><button class="btn ghost" data-act="newfolder">New Folder</button></div></div>`;
   }
   if (S.folderId === null && S.books.length) {
@@ -186,11 +224,12 @@ function navTools() {
 function headerHTML() {
   const cur = folderById(S.folderId);
   const parent = cur ? folderById(cur.parentId) : null;
-  const inToRead = S.folderId === TOREAD;
-  const back = cur || inToRead ? `<button class="back" id="backBtn">${ICON.back}<span>${esc(parent ? parent.name : 'Library')}</span></button>` : '<span></span>';
+  const coll = collectionById(S.folderId);
+  const back = cur || coll ? `<button class="back" id="backBtn">${ICON.back}<span>${esc(parent ? parent.name : 'Library')}</span></button>` : '<span></span>';
+  const where = coll ? coll.name : cur ? 'this folder' : 'all books';
   return `<div class="navbar"><div class="navrow">${back}${navTools()}</div>
-    <h1 class="bigtitle">${esc(inToRead ? 'To Read' : cur ? cur.name : 'Library')}</h1>
-    ${S.books.length || S.folders.length ? `<label class="search">${ICON.search}<input id="search" type="search" placeholder="Title, author or file name" value="${esc(S.search)}" aria-label="Search this folder"></label>` : ''}
+    <h1 class="bigtitle">${esc(coll ? coll.name : cur ? cur.name : 'Library')}</h1>
+    ${S.books.length || S.folders.length ? `<label class="search">${ICON.search}<input id="search" type="search" placeholder="Search ${esc(where)}" value="${esc(S.search)}" aria-label="Search ${esc(where)}"></label>` : ''}
   </div>`;
 }
 
@@ -204,15 +243,29 @@ function treeHTML(parentId, depth) {
   }).join('');
 }
 
+/** "Pick up where you left off": the most recently read book, at the top of the sidebar. */
+function resumeHTML() {
+  const b = recentBooks()[0];
+  if (!b) return '';
+  const pct = Math.round((S.progress[b.id].fraction || 0) * 100);
+  return `<button class="resume" data-book="${b.id}" aria-label="Continue reading ${esc(b.title)}">
+    <span class="resume-cover">${coverHTML(b)}</span>
+    <span class="resume-meta"><span class="resume-kicker">Pick up where you left off</span>
+      <span class="resume-title">${esc(b.title)}</span>${b.author ? `<span class="ba">${esc(b.author)}</span>` : ''}
+      <span class="prog"><span class="bar"><i style="width:${pct}%"></i></span>${pct}%</span>
+      <span class="resume-when">${relTime(S.progress[b.id].last)}</span></span></button>`;
+}
+
 function render() {
   S.wide = window.innerWidth >= 600;
   const main = `<main class="detail">${headerHTML()}<div class="scroll" id="scroll">${contentsHTML()}</div></main>`;
   if (S.wide) {
     app.innerHTML = `<nav class="sidebar" aria-label="Folders"><div class="navbar"><div class="navrow"><span></span></div><div class="bigtitle">BookNest</div></div>
       <div class="scroll">
-        <div class="sec-h">Lists</div>
-        <div class="tree"><button class="tnode${S.folderId === TOREAD ? ' sel' : ''}" data-tree="${TOREAD}">
-          <span class="disc" style="visibility:hidden"></span>${ICON.bookmark}<span class="lbl">To Read</span><span class="tcount">${S.books.filter(b => b.toRead).length}</span></button></div>
+        ${resumeHTML()}
+        <div class="sec-h">Collections</div>
+        <div class="tree">${COLLECTIONS.map(c => `<button class="tnode${S.folderId === c.id ? ' sel' : ''}" data-tree="${c.id}">
+          <span class="disc" style="visibility:hidden"></span>${ICON[c.icon]}<span class="lbl">${c.name}</span><span class="tcount">${c.books().length}</span></button>`).join('')}</div>
         <div class="sec-h">Folders</div>
         <div class="tree"><button class="tnode${S.folderId === null ? ' sel' : ''}" data-tree="">
           <span class="disc" style="visibility:hidden"></span>${ICON.folder}<span class="lbl">Library</span></button>${treeHTML(null, 1)}</div>
@@ -269,7 +322,7 @@ function bind() {
   app.querySelectorAll('[data-act="add"]').forEach(b => b.onclick = () => fileInput.click());
   app.querySelectorAll('[data-act="newfolder"]').forEach(b => b.onclick = newFolder);
   const back = document.getElementById('backBtn');
-  if (back) back.onclick = () => go(S.folderId === TOREAD ? null : folderById(S.folderId)?.parentId ?? null);
+  if (back) back.onclick = () => go(isCollection(S.folderId) ? null : folderById(S.folderId)?.parentId ?? null);
   const search = document.getElementById('search');
   if (search) search.oninput = () => {
     S.search = search.value;
@@ -394,6 +447,17 @@ async function toggleToRead(b) {
   render();
 }
 
+async function setFinished(b, finished) {
+  // last: 0 for a book never opened, so marking it doesn't count as reading it
+  const p = S.progress[b.id] || { bookId: b.id, chapter: 0, offset: 0, page: 0, fraction: 0, last: 0 };
+  p.finished = finished;
+  if (!finished && p.fraction >= 0.99) p.fraction = 0.98;   // otherwise it would still count as finished
+  S.progress[b.id] = p;
+  await db.put('progress', p);
+  toast(finished ? `Marked “${b.title}” as finished` : `Marked “${b.title}” as not finished`);
+  render();
+}
+
 async function resetProgress(b) {
   await db.del('progress', b.id);
   delete S.progress[b.id];
@@ -454,6 +518,7 @@ onLongPress(app, '[data-book], [data-folder], [data-tree]', el => {
       { label: 'Move to…', action: () => moveBook(b) },
       { label: 'Rename…', action: () => renameBook(b) },
     ];
+    items.push({ label: isFinished(b) ? 'Mark as Not Finished' : 'Mark as Finished', action: () => setFinished(b, !isFinished(b)) });
     if (S.progress[b.id]) items.push({ label: 'Reset Reading Progress', action: () => resetProgress(b) });
     items.push({ label: 'Delete Book', destructive: true, action: () => deleteBook(b) });
     actionSheet(b.title, items);

@@ -102,6 +102,20 @@ body.reading .app { visibility: hidden; }
 .recent::-webkit-scrollbar { display: none; }
 .recent .book { width: 96px; flex: none; }
 
+/* ---------- sidebar: resume card ---------- */
+.resume { display: flex; gap: 12px; align-items: stretch; width: calc(100% - 24px); margin: 4px 12px 6px; padding: 12px; text-align: left; border-radius: 14px; background: var(--surface); }
+.resume-cover { width: 58px; flex: none; }
+.resume-cover .cover { padding: 5px; }
+.resume-cover .cover .ct { font-size: 8px; } .resume-cover .cover .ca, .resume-cover .cover .cf { display: none; }
+.resume-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.resume-kicker { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--accent); }
+.resume-title { font-size: 15px; font-weight: 600; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.resume-meta .ba { font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.resume-meta .prog { margin-top: auto; }
+.resume-when { font-size: 11.5px; color: var(--muted); }
+.book .bw { font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 4px; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.book .bw .folder-ic { width: 12px; height: 10px; }
+
 /* ---------- sidebar tree ---------- */
 .tree { padding: 0 8px; }
 .tnode { display: flex; align-items: center; gap: 6px; width: 100%; padding: 8px; border-radius: 9px; text-align: left; font-size: 16px; }
@@ -192,7 +206,7 @@ body.dropping::after { content: "Drop books to add them"; position: fixed; inset
 .chrome.bottom .loc span:first-child { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 
 /* bookmark ribbon on a bookmarked page, and the find bar */
-.r-ribbon { position: absolute; z-index: 2; top: calc(var(--st) + 2px); right: calc(var(--sr) + 22px); width: 16px; height: 26px; background: #7b1e2e; box-shadow: 0 1px 3px rgba(0,0,0,.3); clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 76%, 0 100%); -webkit-clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 76%, 0 100%); pointer-events: none; }
+.r-ribbon { position: absolute; z-index: 2; top: calc(var(--st) + 2px); right: calc(var(--sr) + 22px); width: 16px; height: 26px; background: #810000; box-shadow: 0 1px 3px rgba(0,0,0,.3); clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 76%, 0 100%); -webkit-clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 76%, 0 100%); pointer-events: none; }
 .findbar { position: absolute; z-index: 3; left: 50%; transform: translateX(-50%); bottom: calc(var(--sb) + 72px); display: flex; align-items: center; gap: 4px; padding: 4px 6px 4px 4px; border-radius: 16px; background: color-mix(in srgb, var(--rbg) 86%, transparent); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); box-shadow: 0 4px 18px rgba(0,0,0,.22), 0 0 0 1px color-mix(in srgb, var(--rfg) 12%, transparent); color: var(--rfg); max-width: calc(100% - 24px); }
 .findbar #fInfo { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; padding: 0 4px; font-variant-numeric: tabular-nums; }
 .findbar .fdone { color: var(--rlink); font-weight: 600; font-size: 15px; padding: 6px 8px; }
