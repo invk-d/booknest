@@ -3,7 +3,8 @@
 :root {
   /* Light: white page, with rows and cards in a soft grey so they still stand out. */
   --bg: #ffffff; --surface: #f2f2f7; --fg: #111318; --muted: #6c7380;
-  --hair: rgba(60, 60, 67, .16); --accent: #3a3a3c; --accent-soft: rgba(60, 60, 67, .10); --on-accent: #ffffff;
+  --hair: rgba(60, 60, 67, .16); --accent: #2f6fe0; --accent-soft: rgba(47, 111, 224, .12); --on-accent: #ffffff;
+  --bar: #3a3a3c; --bar-soft: rgba(60, 60, 67, .10);   /* top bar buttons and back link */
   --danger: #e5383b; --sheet: #ffffff; --raised: #ffffff;
   --ui: -apple-system, "SF Pro Text", system-ui, "Segoe UI", Roboto, sans-serif;
   --serif: "New York", ui-serif, Georgia, "Times New Roman", serif;
@@ -14,11 +15,13 @@
 /* Library appearance: follows the phone unless the user picks Light or Dark in BookNest. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) { --bg: #000000; --surface: #1c1c1e; --fg: #f2f2f7; --muted: #98989f;
-          --hair: rgba(84, 84, 88, .6); --accent: #c7c7cc; --accent-soft: rgba(199, 199, 204, .16); --on-accent: #000000;
+          --hair: rgba(84, 84, 88, .6); --accent: #6d9bff; --accent-soft: rgba(109, 155, 255, .16); --on-accent: #ffffff;
+          --bar: #c7c7cc; --bar-soft: rgba(199, 199, 204, .16);
           --danger: #ff5c5f; --sheet: #2c2c2e; --raised: #636366; color-scheme: dark; }
 }
 :root[data-theme="dark"] { --bg: #000000; --surface: #1c1c1e; --fg: #f2f2f7; --muted: #98989f;
-          --hair: rgba(84, 84, 88, .6); --accent: #c7c7cc; --accent-soft: rgba(199, 199, 204, .16); --on-accent: #000000;
+          --hair: rgba(84, 84, 88, .6); --accent: #6d9bff; --accent-soft: rgba(109, 155, 255, .16); --on-accent: #ffffff;
+          --bar: #c7c7cc; --bar-soft: rgba(199, 199, 204, .16);
           --danger: #ff5c5f; --sheet: #2c2c2e; --raised: #636366; color-scheme: dark; }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -38,11 +41,11 @@ body.reading .app { visibility: hidden; }
 .app > .detail:only-child { padding-left: var(--sl); }
 .navbar { padding: calc(var(--st) + 6px) 16px 8px; flex: none; }
 .navrow { display: flex; align-items: center; justify-content: space-between; min-height: 36px; gap: 8px; }
-.back { color: var(--accent); font-size: 17px; display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 60%; }
+.back { color: var(--bar); font-size: 17px; display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 60%; }
 .back span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .tools { display: flex; gap: 8px; align-items: center; margin-left: auto; }
-.icon-btn { color: var(--accent); width: 34px; height: 34px; display: grid; place-items: center; border-radius: 9px; }
-.icon-btn[aria-expanded="true"] { background: var(--accent-soft); }
+.icon-btn { color: var(--bar); width: 34px; height: 34px; display: grid; place-items: center; border-radius: 9px; }
+.icon-btn[aria-expanded="true"] { background: var(--bar-soft); }
 .bigtitle { font-size: 32px; font-weight: 700; letter-spacing: -.02em; margin: 2px 0 8px; overflow-wrap: anywhere; text-wrap: balance; }
 .search { display: flex; align-items: center; gap: 6px; background: color-mix(in srgb, var(--muted) 16%, transparent); border-radius: 10px; padding: 8px 10px; color: var(--muted); }
 .search input { flex: 1; min-width: 0; border: 0; background: none; font: inherit; font-size: 16px; color: var(--fg); outline: none; }
