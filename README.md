@@ -7,6 +7,7 @@ An eReader with folders. It runs in Safari and can be added to your iPhone Home 
 ## Features
 - **Folders inside folders.** Create, rename, move and delete them. Press and hold a book or folder for options.
 - **Add books from the Files app:** EPUB, PDF, TXT and Markdown. On a computer you can also drag files onto the window.
+- **Settings (⚙︎):** back up and restore; theme, interface text size and accent colour; and a How to Use guide.
 - **Light or dark library:** tap the sun/moon button at the top of the library to choose Light, Dark or Automatic (matches your iPhone).
 - **Sort** by Title (ignoring "The", "A" and "An"), Author (last name first), File Name, Date Added or Recently Read. Grid or list view, and search by title, author or file name.
 - **Collections:** All Books, Favourites, Currently Reading, Recently Added, Unread, Finished and To Read gather books from every folder. Press and hold a book to **Add to Favourites** or **Mark as Finished**. When the phone is open, the sidebar starts with a **Pick up where you left off** card for the book you read last.
@@ -34,9 +35,9 @@ Tap **+ → Import Folder…**.
 BookNest recreates the folder and all its subfolders inside the folder you're viewing, and ignores files that aren't books. Importing the same folder again merges into the existing folders and only adds books you don't already have.
 
 ## Backups
-Tap **⋯ → Back Up Library…**, then choose **Save to Files** on the Share sheet. The backup is a small `.json` file holding your folders, book list, reading progress and settings. The book files themselves stay in the Files app and are never touched.
+Tap **⚙︎ Settings → Back Up Library…**, then choose **Save to Files** on the Share sheet. The backup is a small `.json` file holding your folders, book list, reading progress and settings. The book files themselves stay in the Files app and are never touched.
 
-To recover, tap **⋯ → Restore from Backup…** (or **Restore from a backup** on the welcome screen) and choose the file. Everything comes back, and books show **File needed** until you add their files again from Files. You can pick them all at once. BookNest recognises each book by its contents and puts it back in its folder with your place kept. Restoring never deletes anything already in BookNest.
+To recover, tap **⚙︎ Settings → Restore from Backup…** (or **Restore from a backup** on the welcome screen) and choose the file. Everything comes back, and books show **File needed** until you add their files again from Files. You can pick them all at once. BookNest recognises each book by its contents and puts it back in its folder with your place kept. Restoring never deletes anything already in BookNest.
 
 ## Put it online with GitHub Pages
 1. Create a repository on GitHub (for example `booknest`) and upload everything in this folder to it.

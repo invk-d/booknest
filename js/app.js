@@ -196,9 +196,6 @@ function contentsHTML() {
     else if (col) h = `<div class="empty">${col.empty}</div>`;
     else h = `<div class="empty">This folder is empty.<div class="empty-btns"><button class="btn" data-act="add">Add Books</button><button class="btn ghost" data-act="newfolder">New Folder</button></div></div>`;
   }
-  if (S.folderId === null && S.books.length) {
-    h += `<p class="foot">Press and hold a book or folder to move, rename or delete it. Books are stored on this device and work offline.</p>`;
-  }
   return h;
 }
 
@@ -220,7 +217,7 @@ function navTools() {
     <button class="icon-btn" id="addBtn" aria-label="Add books or folder">${ICON.plus}</button>
     <button class="icon-btn" id="themeBtn" aria-label="Library appearance: ${({ system: 'Automatic', light: 'Light', dark: 'Dark' })[S.appearance]}">${({ system: ICON.autoTheme, light: ICON.sun, dark: ICON.moon })[S.appearance]}</button>
     <button class="icon-btn" id="sortBtn" aria-label="Sort and view" aria-expanded="${S.sortOpen}">${ICON.sort}</button>
-    <button class="icon-btn" id="moreBtn" aria-label="Back up or restore library">${ICON.more}</button></div>`;
+    <button class="icon-btn" id="settingsBtn" aria-label="Settings">${ICON.gear}</button></div>`;
 }
 
 function headerHTML() {
@@ -350,8 +347,8 @@ function bind() {
       { label: 'Automatic (match iPhone)' + mark('system'), action: pick('system') },
     ]);
   };
-  const more = document.getElementById('moreBtn');
-  if (more) more.onclick = backupMenu;
+  const gear = document.getElementById('settingsBtn');
+  if (gear) gear.onclick = openSettings;
   app.querySelectorAll('[data-act="restore"]').forEach(b => b.onclick = () => restoreInput.click());
   app.querySelectorAll('[data-act="importfolder"]').forEach(b => b.onclick = importFolder);
   const sb = document.getElementById('sortBtn');
@@ -623,13 +620,85 @@ function importFolder() {
 window.addEventListener('focus', () => setTimeout(() => { if (!fileInput.files?.length) relinkId = null; }, 1000));
 
 // ---------- backup & restore ----------
-function backupMenu() {
-  const last = pref('lastBackup', null);
-  const when = last ? `Last backed up ${new Date(last).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}.` : 'Not backed up yet.';
-  actionSheet(`${when} A backup holds your folders, reading progress and settings. Book files stay in the Files app.`, [
-    { label: 'Back Up Library…', action: backUp },
-    { label: 'Restore from Backup…', action: () => restoreInput.click() },
-  ]);
+// ---------- settings ----------
+const ACCENTS = [['blue', 'Blue', '#2f6fe0', '#6d9bff'], ['purple', 'Purple', '#7d4cdb', '#a98bff'], ['pink', 'Pink', '#d6336c', '#ff6fa3'], ['red', 'Red', '#d23a3a', '#ff6b6b'], ['orange', 'Orange', '#d9730d', '#ffa94d'], ['green', 'Green', '#2b9348', '#5fd38a'], ['teal', 'Teal', '#0f8b8d', '#4fd1d3'], ['graphite', 'Graphite', '#5c5f66', '#a1a4ab']];   // id, name, light, dark
+const UI_SIZES = [[0.88, 'Smaller'], [1, 'Default'], [1.12, 'Larger'], [1.25, 'Largest']];
+
+function applyLook() {
+  const root = document.documentElement;
+  const acc = pref('accent', 'blue');
+  if (acc === 'blue') delete root.dataset.accent; else root.dataset.accent = acc;
+  const z = pref('uiScale', 1);
+  if (z === 1) root.style.removeProperty('--ui-zoom'); else root.style.setProperty('--ui-zoom', z);
+}
+
+const HOWTO = [
+  ['plus', 'Adding books', `<p>Tap <b>+ → Add Books…</b> and choose EPUB, PDF, TXT or Markdown files from the Files app. You can select several at once. New books go into the folder you're viewing.</p><p>Adding a book that's already in your library is recognised and skipped.</p>`],
+  ['folder', 'Importing a whole folder', `<p>Tap <b>+ → Import Folder…</b>. On iPhone, first open the Files app, press and hold the folder and tap <b>Compress</b>, then choose the .zip it makes. BookNest rebuilds the folder with all its subfolders.</p><p>Import the same folder again later to add only the books that are new.</p>`],
+  ['folder', 'Organising folders and books', `<p>Tap <b>+ → New Folder…</b> to make a folder inside the one you're viewing.</p><p><b>Press and hold</b> any book or folder to move, rename or delete it. Deleting only removes it from BookNest; your files in Files aren't touched.</p>`],
+  ['allBooks', 'Collections', `<p>Collections gather books from every folder: <b>All Books</b>, <b>Favourites</b>, <b>Currently Reading</b>, <b>Recently Added</b>, <b>Unread</b>, <b>Finished</b> and <b>To Read</b>.</p><p>Press and hold a book to <b>Mark as Finished</b> (or not finished).</p>`],
+  ['heart', 'Favourites and To Read', `<p>Press and hold a book and choose <b>Add to Favourites</b> or <b>Add to To Read</b>. Books on your To Read list get an orange ribbon on the cover. Choose the same option again to remove it.</p>`],
+  ['search', 'Searching your library', `<p>The search box on the main Library page searches every book and folder. Inside a folder or collection, it searches just that one.</p>`],
+  ['reading', 'Reading', `<p>Tap the right or left edge of the page, swipe, or drag a page corner to turn pages. Tap the middle to show or hide the controls.</p><p>Tap <b>Aa</b> for themes, fonts, text size, spacing, margins, paragraph spacing, pages or scrolling, and the page curl.</p><p>BookNest remembers your place in every book.</p>`],
+  ['mark', 'Bookmarks', `<p>While reading, tap the <b>bookmark</b> button at the top to bookmark the page; a ribbon shows on bookmarked pages. Tap it again to remove it.</p><p>See all bookmarks under <b>Contents → Bookmarks</b>.</p>`],
+  ['find', 'Finding text in a book', `<p>While reading, tap the <b>magnifier</b> and type. Tap a match to jump to it highlighted, then use <b>‹ ›</b> to step through matches.</p>`],
+  ['gear', 'Backing up and restoring', `<p>In Settings, tap <b>Back Up Library…</b> and choose <b>Save to Files</b>. The backup holds your folders, book list, reading progress, bookmarks, marks and settings. Book files aren't included.</p><p>To recover, tap <b>Restore from Backup…</b>. Books then show <b>File needed</b>: add them again from Files (all at once is fine) and each goes back into its folder with your place kept.</p>`],
+  ['book', 'Home Screen and offline', `<p>In Safari, tap <b>Share → Add to Home Screen</b> to use BookNest like an app. Your books are stored on this device and work offline. Add books from the Home Screen app, not a Safari tab; iPhone keeps their storage separate.</p>`],
+  ['reading', 'iPhone Duo: open and closed', `<p>Closed, you get one column and single pages. Open, you get a sidebar with collections and folders, and books show as two-page spreads that turn on the middle line. Your place is kept as you fold and unfold.</p>`],
+];
+
+function openSettings() {
+  const wrap = document.createElement('div');
+  wrap.className = 'settings-wrap';
+  const render = () => {
+    const last = pref('lastBackup', null);
+    const acc = pref('accent', 'blue'), z = pref('uiScale', 1);
+    const seg = (attr, items, cur) => `<div class="segm" role="group">${items.map(([v, l]) => `<button ${attr}="${v}" aria-pressed="${String(v) === String(cur)}">${l}</button>`).join('')}</div>`;
+    wrap.innerHTML = `<div class="settings" role="dialog" aria-modal="true" aria-label="Settings">
+      <header><b>Settings</b><button id="setDone">Done</button></header>
+      <div class="set-body">
+        <div class="sec-h">Back-up</div>
+        <div class="group">
+          <button class="set-row" data-set="backup">Back Up Library…</button>
+          <button class="set-row" data-set="restore">Restore from Backup…</button>
+        </div>
+        <p class="foot">${last ? `Last backed up ${new Date(last).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}.` : 'Not backed up yet.'} A backup holds your folders, reading progress, bookmarks and settings. Book files stay in the Files app.</p>
+
+        <div class="sec-h">Appearance</div>
+        <div class="group">
+          <div class="set-block"><span>Theme</span>${seg('data-look', [['system', 'Automatic'], ['light', 'Light'], ['dark', 'Dark']], S.appearance)}</div>
+          <div class="set-block"><span>Interface text size</span>${seg('data-size', UI_SIZES.map(([v, l]) => [v, l]), z)}
+            <span class="size-preview">Library, menus and settings. Book text is set in the reader’s <b>Aa</b> menu.</span></div>
+          <div class="set-block"><span>Accent colour</span><div class="swatch-row">${ACCENTS.map(([id, name, light, dark]) =>
+            `<button class="swatch" data-accent="${id}" aria-pressed="${id === acc}" style="--c:${document.documentElement.dataset.theme === 'dark' || (!document.documentElement.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches) ? dark : light}"><i></i>${name}</button>`).join('')}</div></div>
+        </div>
+
+        <div class="sec-h">How to Use</div>
+        <div class="group howto">${HOWTO.map(([icon, title, body]) => `<details><summary>${ICON[icon].replace('<svg', '<svg class="folder-ic"').replace('class="folder-ic" class="folder-ic"', 'class="folder-ic"')}<span>${title}</span></summary><div class="hbody">${body}</div></details>`).join('')}</div>
+        <p class="set-foot">BookNest</p>
+      </div></div>`;
+    wrap.querySelector('#setDone').onclick = close;
+    wrap.querySelector('[data-set="backup"]').onclick = () => { close(); backUp(); };
+    wrap.querySelector('[data-set="restore"]').onclick = () => { restoreInput.click(); close(); };
+    wrap.querySelectorAll('[data-look]').forEach(b => b.onclick = () => { S.appearance = b.dataset.look; setPref('appearance', S.appearance); applyAppearance(); keepOpen(); });
+    wrap.querySelectorAll('[data-size]').forEach(b => b.onclick = () => { setPref('uiScale', +b.dataset.size); applyLook(); keepOpen(); });
+    wrap.querySelectorAll('[data-accent]').forEach(b => b.onclick = () => { setPref('accent', b.dataset.accent); applyLook(); keepOpen(); });
+  };
+  // Re-draw the settings (and the library behind) after a change, keeping open sections and scroll.
+  const keepOpen = () => {
+    const body = wrap.querySelector('.set-body'), top = body.scrollTop;
+    const open = [...wrap.querySelectorAll('details')].map(d => d.open);
+    window.__bnRender(); render();
+    wrap.querySelectorAll('details').forEach((d, i) => { d.open = !!open[i]; });
+    wrap.querySelector('.set-body').scrollTop = top;
+  };
+  const onKey = e => { if (e.key === 'Escape') close(); };
+  function close() { document.removeEventListener('keydown', onKey); wrap.remove(); }
+  wrap.addEventListener('click', e => { if (e.target === wrap) close(); });
+  document.addEventListener('keydown', onKey);
+  render();
+  document.body.appendChild(wrap);
+  wrap.querySelector('#setDone').focus({ preventScroll: true });
 }
 
 async function backUp() {
@@ -666,6 +735,7 @@ restoreInput.onchange = async () => {
     S.expanded = new Set(pref('expanded', []));
     await loadAll();
     applyAppearance();
+    applyLook();
     S.folderId = null;
     render();
     toast(r.missing ? `Restored. ${r.missing} ${r.missing === 1 ? 'book needs its file' : 'books need their files'}: add them from the Files app and they’ll go back in place.` : 'Library restored', 6000);
@@ -717,6 +787,8 @@ addEventListener('resize', () => {
   }
   lastWide = window.innerWidth >= 600;
   applyAppearance();
+  applyLook();
+  window.__bnRender = render;
   render();
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     const hadController = !!navigator.serviceWorker.controller;
