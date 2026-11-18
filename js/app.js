@@ -217,7 +217,7 @@ function navTools() {
     <button class="icon-btn" id="addBtn" aria-label="Add books or folder">${ICON.plus}</button>
     <button class="icon-btn" id="themeBtn" aria-label="Library appearance: ${({ system: 'Automatic', light: 'Light', dark: 'Dark' })[S.appearance]}">${({ system: ICON.autoTheme, light: ICON.sun, dark: ICON.moon })[S.appearance]}</button>
     <button class="icon-btn" id="sortBtn" aria-label="Sort and view" aria-expanded="${S.sortOpen}">${ICON.sort}</button>
-    <button class="icon-btn" id="settingsBtn" aria-label="Settings">${ICON.gear}</button></div>`;
+    <button class="icon-btn" id="settingsBtn" aria-label="Settings">${ICON.more}</button></div>`;
 }
 
 function headerHTML() {
